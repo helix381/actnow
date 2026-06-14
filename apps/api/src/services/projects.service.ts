@@ -221,7 +221,7 @@ export class ProjectsService {
               projectId,
               episodeId: episode.id,
               version,
-              content: body.content?.trim() || String(project.settings),
+              content: body.content?.trim() || this.extractInitialInput(project.settings) || "（锁定时未提供剧本内容）",
               source: "lock",
               lockedAt: new Date()
             }
@@ -363,5 +363,15 @@ export class ProjectsService {
     }
 
     return route;
+  }
+
+  private extractInitialInput(settings: unknown): string {
+    if (settings && typeof settings === "object" && !Array.isArray(settings)) {
+      const value = (settings as Record<string, unknown>).initial_input;
+      if (typeof value === "string") {
+        return value.trim();
+      }
+    }
+    return "";
   }
 }
