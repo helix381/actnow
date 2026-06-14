@@ -2,7 +2,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| 文档版本 | v0.1 草案 |
+| 文档版本 | v0.1 草案（OQ3/OQ7 已决，见 §8）|
 | 创建日期 | 2026-06-14 |
 | 定位 | 前后端共同 contract：把「原型 workspace.html 的产品主线」逐 turn 映射到后端 API / 事件 / 数据写入，并列出改造清单与实施切片 |
 | 真源关系 | `prototype/pages/workspace.html` = 产品真源；本文 = 实现对齐基准；与 `PRD-Multi-Agent-Chatroom.md`（产品意图）配套 |
@@ -147,13 +147,15 @@ chat stage 是一条**线性引导流**，右侧「阅读时间轴」6 节点贯
 
 ## 7. 实施切片建议（每片可独立提交/回滚）
 
+> **MVP 范围（OQ3 已决 2026-06-14）**：整季大纲 + 仅第 1 集打通「剧本→资产→画布」闭环；下表 S-D/S-E/S-F 默认只处理第 1 集，多集为后续迭代。
+
 | 切片 | 范围 | 端 | 依赖 | 验证 |
 | --- | --- | --- | --- | --- |
 | S-A | 数据模型：Asset(kind) + Approval 表 + Episode.synopsis/Project.logline + migration | 后端/DB | — | prisma validate + build |
 | S-B | 导演路由改造：options + create_outline + 废弃参数卡 | 后端 | — | 路由单测/手测 |
 | S-C | 大纲：`outline.generated` + create_outline 确认写入 | 后端 | S-A,S-B | 发消息→确认→Episode 落库 |
-| S-D | 逐集剧本：`script.generated` + draft_script 写入结构化 ScriptDraft | 后端 | S-A,S-C | 确认→ScriptDraft 落库 |
-| S-E | 逐集资产：`asset.extracted` + create_asset 写入 Asset | 后端 | S-A,S-D | 确认→Asset 落库 |
+| S-D | 第1集剧本：`script.generated` + draft_script 写入结构化 ScriptDraft | 后端 | S-A,S-C | 确认→ScriptDraft 落库 |
+| S-E | 第1集资产：`asset.extracted` + create_asset 写入 Asset | 后端 | S-A,S-D | 确认→Asset 落库 |
 | S-F | 推入画布：canvas 初始化对齐 studio 节点（资产/分镜/分镜图/视频/合成） | 后端 | S-E | canvas nodes ref 正确 |
 | S-G | 前端工程化：workspace.html → React 真前端（四 stage + 时间轴 + 画布内嵌三态） | 前端 | S-A~S-F | 端到端走通主线 |
 
@@ -165,8 +167,8 @@ chat stage 是一条**线性引导流**，右侧「阅读时间轴」6 节点贯
 
 - **OQ1 资产建模**：单一 `Asset(kind)` 表 vs Character/Scene/Prop 分表？（建议单表起步）
 - **OQ2 剧本存储**：`ScriptDraft.contentJson` 结构化 vs 约定 markdown 文本？（影响画布读取与编辑回写）
-- **OQ3「集」维度 MVP**：本期做几集？原型展示整季 6 集但只生成第 1 集——MVP 是否只打通「整季大纲 + 第 1 集剧本/资产」？
+- **OQ3「集」维度 MVP**：✅ 已决（2026-06-14）——**整季大纲 + 仅第 1 集打通「剧本→资产→画布」闭环**；第 2 集起后续迭代。
 - **OQ4 天眼层 / Canonical IR**：原型大纲卡有「天眼层·AI 暗骨」预留位，本期纳入还是继续预留？
 - **OQ5 画布 studio 完整度**：S-F 本期做到哪——只初始化资产框+剧本节点，还是含分镜/分镜图/视频/合成全套？
 - **OQ6 上传整季剧本入口**：本期是否实现（涉及整季解析拆分），还是先只做一句话灵感？
-- **OQ7 下一步执行**：本规格确认后，从 S-A 开始落地，还是先做 S-G 前端工程化？
+- **OQ7 下一步执行**：✅ 已决（2026-06-14）——**本期先评审定稿本文档，暂不写代码**；定稿后再定 S-A / S-G 起点。
