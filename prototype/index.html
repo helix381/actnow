@@ -1,0 +1,51 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIGC-Platform Prototype</title>
+  <link rel="stylesheet" href="./design-system/theme.css" />
+</head>
+<body>
+  <main class="page">
+    <aside class="sidebar">
+      <div class="brand">Make-Prototype</div>
+      <a href="./弃用-workbench.html">风格工作台</a>
+      <a href="./弃用-canvas.html">页面画布</a>
+      <a href="./弃用-wireframe.html">线框原型</a>
+      <a href="./弃用-index.html" aria-current="page">高保真起点</a>
+    </aside>
+    <section class="surface">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">High fidelity starter</p>
+          <h1>AIGC-Platform</h1>
+          <p>这是从 design-model.json 生成的高保真起点。确认视觉和流程后继续深化具体页面。</p>
+        </div>
+        <div class="toolbar"><button>输入</button> <button>上传</button> <button>开始</button></div>
+      </header>
+      <div class="grid">
+        <article class="panel">
+          <h2>主流程</h2>
+          <div class="node done">首页/创作页</div>
+          <div class="node active">创意聊天台</div>
+          <div class="node">制作画布</div>
+          <div class="node">资产节点/资产库</div>
+          <div class="node">分镜脚本节点</div>
+        </article>
+        <article class="panel">
+          <h2>当前状态</h2>
+          <p>覆盖成功、空、加载、错误和等待回传状态。人在环任务必须绑定 task_id。</p>
+          <div class="status-list"><span class="pill">prompt_ready</span><span class="pill">waiting_upload</span><span class="pill">failed</span><span class="pill">completed</span></div>
+        </article>
+        <article class="panel">
+          <h2>Agent 操作</h2>
+          <textarea>把第 8 镜改得更压迫一点，只重跑目标镜头。</textarea>
+          <div class="toolbar"><button>发送</button><button class="secondary">查看影响范围</button></div>
+        </article>
+      </div>
+    </section>
+  </main>
+  <script src="./design-system/prototype.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIGC-Platform Prototype Workbench</title>
+  <link rel="stylesheet" href="./design-system/theme.css" />
+</head>
+<body>
+  <main class="page">
+    <aside class="sidebar">
+      <div class="brand">Make-Prototype</div>
+      <a href="./弃用-workbench.html" aria-current="page">风格工作台</a>
+      <a href="./弃用-canvas.html">页面画布</a>
+      <a href="./弃用-wireframe.html">线框原型</a>
+      <a href="./弃用-index.html">高保真起点</a>
+    </aside>
+    <section class="surface">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Prototype workbench</p>
+          <h1>AIGC-Platform 原型工作台</h1>
+          <p>产品类型：Web应用。先确认参考吸收、视觉方向、页面清单和流转，再进入高保真。</p>
+        </div>
+        <button data-open="./弃用-canvas.html">查看页面画布</button>
+      </header>
+      <div class="grid">
+        <article class="panel control-room">
+          <p class="eyebrow">Style option</p>
+          <h2>A. Control Room</h2>
+          <p>高密度、低装饰、状态清楚，适合复杂工具和后台。</p>
+          <div class="toolbar"><button data-open="./iterations/style-option-a.html">预览</button><button class="secondary" data-open="./弃用-canvas.html">看画布</button></div>
+        </article>
+        <article class="panel narrative-product">
+          <p class="eyebrow">Style option</p>
+          <h2>B. Narrative Product</h2>
+          <p>品牌感更强，适合内容产品和对外展示，但不做空泛营销页。</p>
+          <div class="toolbar"><button data-open="./iterations/style-option-b.html">预览</button><button class="secondary" data-open="./弃用-canvas.html">看画布</button></div>
+        </article>
+        <article class="panel data-studio">
+          <p class="eyebrow">Style option</p>
+          <h2>C. Data Studio</h2>
+          <p>指标、筛选、钻取和生成进度优先，适合数据与任务监控。</p>
+          <div class="toolbar"><button data-open="./iterations/style-option-c.html">预览</button><button class="secondary" data-open="./弃用-canvas.html">看画布</button></div>
+        </article>
+      </div>
+    </section>
+  </main>
+  <script src="./design-system/prototype.js"></script>
+</body>
+</html>

@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ActNow · 我的创作</title>
+  <link rel="stylesheet" href="../design-system/theme.css" />
+  <style>
+    body { overflow-x: hidden; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 192px minmax(0, 1fr); }
+
+    /* ===== 左导航（与 home.html 共享结构） ===== */
+    .nav { background: #101117; border-right: 1px solid var(--line); padding: 20px 16px; display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100vh; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 18px; }
+    .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--primary), #9b6bff); display: grid; place-items: center; font-weight: 800; color: #fff; }
+    .brand b { font-size: 18px; letter-spacing: -.02em; }
+    .brand small { color: var(--muted); font-size: 11px; display: block; letter-spacing: .04em; }
+    .nav-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 10px; color: var(--muted); font-size: 14px; cursor: pointer; transition: background var(--motion-duration) var(--motion-ease), color var(--motion-duration) var(--motion-ease); }
+    .nav-item:hover { background: var(--surface); color: var(--foreground); }
+    .nav-item.active { background: rgba(91,120,255,.14); color: var(--foreground); font-weight: 600; }
+    .nav-item .ic { width: 18px; text-align: center; opacity: .9; }
+    .nav-spacer { flex: 1; }
+    .nav-bottom { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px; }
+    .credits-row { display: flex; align-items: center; gap: 7px; padding: 7px 10px; margin-bottom: 4px; }
+    .credits-row .cr-ic { font-size: 14px; }
+    .credits-row .cr-val { font-size: 12px; color: var(--muted); flex: 1; }
+    .credits-row .cr-val b { color: var(--foreground); font-size: 13px; }
+    .cr-add { width: 22px; height: 22px; border-radius: 7px; background: rgba(91,120,255,.18); border: 1px solid rgba(91,120,255,.35); color: var(--primary); font-size: 15px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; line-height: 1; }
+    .cr-add:hover { background: rgba(91,120,255,.32); }
+    .nav-user-wrap { position: relative; }
+    .nav-user { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 10px; cursor: pointer; transition: background var(--motion-duration) var(--motion-ease); }
+    .nav-user:hover { background: var(--surface); }
+    .nav-user .ava { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg,#34d8b4,#5b78ff); flex-shrink: 0; }
+    .nav-user .nm { font-size: 13px; flex: 1; } .nav-user .nm small { color: var(--muted); display: block; font-size: 11px; }
+    .nav-user .arr { color: var(--muted); font-size: 11px; }
+    .user-popup { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0;
+      background: #1e2028; border: 1px solid var(--line); border-radius: 12px; padding: 6px;
+      opacity: 0; transform: translateY(6px); pointer-events: none;
+      transition: opacity .18s var(--motion-ease), transform .18s var(--motion-ease); z-index: 20; }
+    .user-popup.open { opacity: 1; transform: translateY(0); pointer-events: all; }
+    .popup-item { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+    .popup-item:hover { background: var(--surface); color: var(--foreground); }
+    .popup-item .pi { width: 16px; text-align: center; }
+
+    /* ===== 主区 ===== */
+    .main { height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
+    .page-header { padding: 28px 40px 0; flex-shrink: 0; }
+    .page-title { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 4px; }
+    .page-sub { font-size: 13px; color: var(--muted); margin: 0 0 22px; }
+
+    /* Tab 栏 */
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding: 0 40px; }
+    .tab { padding: 10px 18px; font-size: 14px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s; }
+    .tab:hover { color: var(--foreground); }
+    .tab.active { color: var(--foreground); border-color: var(--primary); font-weight: 600; }
+
+    /* 内容区 */
+    .tab-content { display: none; flex: 1; padding: 24px 40px 60px; overflow-y: auto; }
+    .tab-content.active { display: block; }
+
+    /* 工具栏 */
+    .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .search-box { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; flex: 1; max-width: 340px; }
+    .search-box input { background: none; border: none; color: var(--foreground); font-size: 13px; outline: none; flex: 1; }
+    .search-box input::placeholder { color: var(--muted); }
+    .filter-chips { display: flex; gap: 7px; }
+    .fchip { font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+    .fchip:hover, .fchip.active { color: var(--foreground); border-color: var(--primary); background: rgba(91,120,255,.1); }
+    .toolbar .ml { margin-left: auto; }
+    .btn-new { display: inline-flex; align-items: center; gap: 7px; background: var(--primary); color: #fff; border: 0; border-radius: 10px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-new:hover { opacity: .9; }
+
+    /* 项目网格 */
+    .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .proj { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; transition: transform var(--motion-duration) var(--motion-ease), border-color var(--motion-duration) var(--motion-ease); position: relative; }
+    .proj:hover { transform: translateY(-3px); border-color: #3a3f4d; }
+    .proj-thumb { height: 130px; position: relative; }
+    .proj-thumb .badge { position: absolute; left: 10px; top: 10px; font-size: 11px; background: rgba(0,0,0,.5); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 3px 9px; }
+    .proj-thumb .ep { position: absolute; right: 10px; bottom: 10px; font-size: 11px; color: #fff; background: rgba(0,0,0,.45); border-radius: 6px; padding: 2px 7px; }
+    .proj-thumb .ctx-btn { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 7px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.12); color: #fff; font-size: 14px; display: grid; place-items: center; opacity: 0; transition: opacity .15s; cursor: pointer; }
+    .proj:hover .ctx-btn { opacity: 1; }
+    .proj-body { padding: 12px 14px 14px; }
+    .proj-body .nm { font-weight: 600; font-size: 14px; }
+    .stage { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); margin-top: 7px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .dot.warn { background: var(--warning); box-shadow: 0 0 0 3px rgba(242,182,87,.18); }
+    .dot.ok { background: var(--accent); }
+    .dot.idle { background: var(--muted); }
+    .bar { height: 4px; border-radius: 999px; background: var(--surface-2); margin-top: 9px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), #9b6bff); }
+    .proj-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+    .proj-meta .date { font-size: 11px; color: var(--muted); }
+    .proj-meta .acts { display: flex; gap: 6px; }
+    .proj-meta .acts span { font-size: 11px; color: var(--muted); cursor: pointer; padding: 2px 7px; border-radius: 6px; background: var(--surface-2); }
+    .proj-meta .acts span:hover { color: var(--foreground); }
+    .new-proj { border: 1px dashed var(--line); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); cursor: pointer; min-height: 200px; }
+    .new-proj:hover { border-color: var(--primary); color: var(--foreground); }
+    .new-proj .ni { font-size: 28px; }
+
+    /* 分组标题 */
+    .section-head { display: flex; align-items: center; gap: 12px; margin: 28px 0 14px; }
+    .section-head h3 { font-size: 15px; font-weight: 600; margin: 0; }
+    .section-head .cnt { font-size: 12px; color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 2px 8px; }
+    .section-head .more { margin-left: auto; font-size: 12px; color: var(--muted); cursor: pointer; }
+    .section-head .more:hover { color: var(--foreground); }
+
+    /* 资产网格 */
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    .asset-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform .15s, border-color .15s; position: relative; }
+    .asset-card:hover { transform: translateY(-2px); border-color: #3a3f4d; }
+    .asset-thumb { position: relative; }
+    .asset-thumb .at-check { position: absolute; top: 7px; left: 7px; width: 18px; height: 18px; border-radius: 5px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.2); display: grid; place-items: center; font-size: 10px; color: #fff; opacity: 0; transition: opacity .15s; }
+    .asset-card:hover .at-check { opacity: 1; }
+    .asset-body { padding: 8px 10px 10px; }
+    .asset-body .an { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .asset-body .am { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .asset-type-tag { position: absolute; right: 7px; top: 7px; font-size: 10px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.12); border-radius: 5px; padding: 2px 6px; color: #fff; }
+
+    /* 类型标签栏 */
+    .cat-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .cat-tab { font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+    .cat-tab:hover { color: var(--foreground); }
+    .cat-tab.active { color: var(--foreground); background: rgba(91,120,255,.14); border-color: var(--primary); }
+
+    /* 模板网格 */
+    .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+    .tpl-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; transition: transform .15s, border-color .15s; }
+    .tpl-card:hover { transform: translateY(-3px); border-color: var(--primary); }
+    .tpl-thumb { height: 120px; }
+    .tpl-body { padding: 12px 14px; }
+    .tpl-body .tn { font-size: 13px; font-weight: 600; }
+    .tpl-body .tm { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; align-items: center; justify-content: space-between; }
+    .tpl-body .use-btn { font-size: 11px; background: rgba(91,120,255,.18); color: var(--primary); border: none; border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+    .tpl-body .use-btn:hover { background: rgba(91,120,255,.32); }
+
+    /* toast */
+    .toast { position: fixed; left: 50%; bottom: 32px; transform: translate(-50%, 12px); background: var(--elevated, #23262f); border: 1px solid var(--line); color: var(--foreground); padding: 11px 18px; border-radius: 12px; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.5); opacity: 0; transition: opacity .2s var(--motion-ease), transform .2s var(--motion-ease); z-index: 50; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    /* 积分弹窗复用 */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(6px); display: grid; place-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity .2s var(--motion-ease); }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal-box { background: #16181f; border: 1px solid var(--line); border-radius: 20px; padding: 24px; width: 420px; max-width: 90vw; box-shadow: 0 32px 80px rgba(0,0,0,.7); }
+    .modal-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; font-size: 16px; font-weight: 600; }
+    .modal-close { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); width: 28px; height: 28px; cursor: pointer; font-size: 12px; }
+    .modal-close:hover { color: var(--foreground); }
+    .credits-display { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .pkg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pkg { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; cursor: pointer; text-align: center; transition: border-color .15s; }
+    .pkg:hover, .pkg.active { border-color: var(--primary); background: rgba(91,120,255,.1); }
+    .pkg-ic { font-size: 22px; margin-bottom: 6px; }
+    .pkg-cr { font-size: 14px; font-weight: 600; }
+    .pkg-pr { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .pkg .best { font-size: 10px; background: var(--primary); color: #fff; border-radius: 999px; padding: 1px 6px; margin-left: 4px; }
+    .set-section { display: flex; flex-direction: column; gap: 2px; }
+    .set-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+    .set-row:last-child { border-bottom: none; }
+    .set-lb { font-size: 13px; color: var(--muted); }
+    .set-sel { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; color: var(--foreground); font-size: 13px; padding: 6px 10px; }
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .tr { position: absolute; inset: 0; background: var(--surface-2); border-radius: 999px; cursor: pointer; transition: background .2s; }
+    .toggle input:checked + .tr { background: var(--primary); }
+    .tr::before { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+    .toggle input:checked + .tr::before { transform: translateX(16px); }
+    .btn-go { display: inline-flex; align-items: center; gap: 8px; background: var(--primary); color: #fff; border: 0; border-radius: 999px; padding: 11px 22px; font-size: 15px; font-weight: 650; min-height: 44px; cursor: pointer; }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .nav { position: static; height: auto; flex-direction: row; flex-wrap: wrap; }
+      .nav-spacer, .nav-bottom { display: none; }
+      .page-header, .tabs, .tab-content { padding-left: 20px; padding-right: 20px; }
+      .proj-grid, .asset-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- ===== 左导航 ===== -->
+  <aside class="nav">
+    <div class="brand">
+      <div class="logo">A</div>
+      <div><b>ActNow</b><small>AIGC 创作工作台</small></div>
+    </div>
+    <div class="nav-item" data-go="./home.html"><span class="ic">✦</span> 创作</div>
+    <div class="nav-item active"><span class="ic">◷</span> 我的创作</div>
+    <div class="nav-spacer"></div>
+    <div class="nav-bottom">
+      <div class="credits-row">
+        <span class="cr-ic">💎</span>
+        <span class="cr-val"><b>1,280</b> 积分</span>
+        <button class="cr-add" id="recharge" title="购买积分">＋</button>
+      </div>
+      <div class="nav-user-wrap">
+        <div class="user-popup">
+          <div class="popup-item" data-action="docs"><span class="pi">📄</span> 帮助文档</div>
+          <div class="popup-item" data-action="tutorial"><span class="pi">🎓</span> 新手教程</div>
+          <div class="popup-item" data-action="settings"><span class="pi">⚙</span> 设置</div>
+        </div>
+        <div class="nav-user">
+          <div class="ava"></div>
+          <div class="nm">玩家_创作者<small>进阶创作者</small></div>
+          <span class="arr">▾</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== 主区 ===== -->
+  <div class="main">
+    <div class="page-header">
+      <h1 class="page-title">我的创作</h1>
+      <p class="page-sub">管理你的作品、资产和模板</p>
+    </div>
+
+    <!-- Tab 栏 -->
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-tab="works">作品</div>
+      <div class="tab" data-tab="assets">资产库</div>
+      <div class="tab" data-tab="templates">模板</div>
+    </div>
+
+    <!-- ===== 作品 tab ===== -->
+    <div class="tab-content active" id="tab-works">
+      <div class="toolbar">
+        <div class="search-box"><span style="color:var(--muted)">⌕</span><input placeholder="搜索项目名…" /></div>
+        <div class="filter-chips">
+          <span class="fchip active" data-filter="all">全部</span>
+          <span class="fchip" data-filter="running">生成中</span>
+          <span class="fchip" data-filter="done">已完成</span>
+          <span class="fchip" data-filter="archived">归档</span>
+        </div>
+        <button class="btn-new ml" data-go="./home.html">＋ 新建项目</button>
+      </div>
+
+      <div class="proj-grid" id="proj-grid">
+        <!-- 项目 1 -->
+        <div class="proj" data-go="./studio.html">
+          <div class="proj-thumb" style="background:linear-gradient(135deg,#2b3a2f,#5a6b3e 55%,#9aa45a)">
+            <span class="badge">🎭 漫剧 · 国风</span><span class="ep">第 3 集</span>
+            <span class="ctx-btn">⋯</span>
+          </div>
+          <div class="proj-body">
+            <div class="nm">《雾隐山河》</div>
+            <div class="stage"><span class="dot warn"></span> 分镜图生成中 · 12/18</div>
+            <div class="bar"><i style="width:68%"></i></div>
+            <div class="proj-meta"><span class="date">2026-06-09</span><div class="acts"><span>继续</span><span>⋯</span></div></div>
+          </div>
+        </div>
+        <!-- 项目 2 -->
+        <div class="proj" data-go="./studio.html">
+          <div class="proj-thumb" style="background:linear-gradient(135deg,#241b3a,#3b2b66 50%,#b65cc9)">
+            <span class="badge">🎭 漫剧 · 赛博</span><span class="ep">第 1 集</span>
+            <span class="ctx-btn">⋯</span>
+          </div>
+          <div class="proj-body">
+            <div class="nm">《赛博红尘》</div>
+            <div class="stage"><span class="dot warn"></span> 视频片段生成中 · 6/14</div>
+            <div class="bar"><i style="width:42%"></i></div>
+            <div class="proj-meta"><span class="date">2026-06-07</span><div class="acts"><span>继续</span><span>⋯</span></div></div>
+          </div>
+        </div>
+        <!-- 项目 3 -->
+        <div class="proj" data-go="./studio.html">
+          <div class="proj-thumb" style="background:linear-gradient(135deg,#3a2b22,#6b4a3e 55%,#caa07a)">
+            <span class="badge">🎭 漫剧 · 古风</span><span class="ep">第 2 集</span>
+            <span class="ctx-btn">⋯</span>
+          </div>
+          <div class="proj-body">
+            <div class="nm">《青衫记》</div>
+            <div class="stage"><span class="dot ok"></span> 已导出成片 · 1080×1920</div>
+            <div class="bar"><i style="width:100%"></i></div>
+            <div class="proj-meta"><span class="date">2026-06-05</span><div class="acts"><span>查看</span><span>下载</span></div></div>
+          </div>
+        </div>
+        <!-- 项目 4 -->
+        <div class="proj">
+          <div class="proj-thumb" style="background:linear-gradient(135deg,#1c2b3a,#2f5a6b 60%,#5aa49a)">
+            <span class="badge">🎭 漫剧 · 写实</span><span class="ep">第 1 集</span>
+            <span class="ctx-btn">⋯</span>
+          </div>
+          <div class="proj-body">
+            <div class="nm">《深海疗愈所》</div>
+            <div class="stage"><span class="dot idle"></span> 剧本草稿阶段</div>
+            <div class="bar"><i style="width:15%"></i></div>
+            <div class="proj-meta"><span class="date">2026-06-03</span><div class="acts"><span>继续</span><span>⋯</span></div></div>
+          </div>
+        </div>
+        <!-- 项目 5 -->
+        <div class="proj">
+          <div class="proj-thumb" style="background:linear-gradient(135deg,#2b242f,#4a3b6b 60%,#7a5cc9)">
+            <span class="badge">🎭 漫剧 · 科幻</span><span class="ep">全 2 集</span>
+            <span class="ctx-btn">⋯</span>
+          </div>
+          <div class="proj-body">
+            <div class="nm">《量子玫瑰》</div>
+            <div class="stage"><span class="dot ok"></span> 全部完成 ✓</div>
+            <div class="bar"><i style="width:100%"></i></div>
+            <div class="proj-meta"><span class="date">2026-05-28</span><div class="acts"><span>查看</span><span>下载</span></div></div>
+          </div>
+        </div>
+        <!-- 新建 -->
+        <div class="new-proj" data-go="./home.html">
+          <span class="ni">＋</span>
+          <span style="font-size:13px">新建项目</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 资产库 tab ===== -->
+    <div class="tab-content" id="tab-assets">
+      <div class="toolbar">
+        <div class="search-box"><span style="color:var(--muted)">⌕</span><input placeholder="搜索资产…" /></div>
+        <button class="btn-new ml" onclick="showToast('上传功能即将上线')">↑ 上传资产</button>
+      </div>
+      <div class="cat-tabs" id="cat-tabs">
+        <span class="cat-tab active" data-cat="all">全部 <span style="color:var(--muted);font-size:11px">47</span></span>
+        <span class="cat-tab" data-cat="char">角色 <span style="color:var(--muted);font-size:11px">12</span></span>
+        <span class="cat-tab" data-cat="scene">场景 <span style="color:var(--muted);font-size:11px">18</span></span>
+        <span class="cat-tab" data-cat="music">音乐 <span style="color:var(--muted);font-size:11px">8</span></span>
+        <span class="cat-tab" data-cat="clip">视频片段 <span style="color:var(--muted);font-size:11px">6</span></span>
+        <span class="cat-tab" data-cat="other">其他 <span style="color:var(--muted);font-size:11px">3</span></span>
+      </div>
+
+      <!-- 角色资产 -->
+      <div class="section-head">
+        <h3>角色</h3><span class="cnt">12</span><span class="more">全部 →</span>
+      </div>
+      <div class="asset-grid">
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:120px;background:linear-gradient(160deg,#2b1f3a,#5a3b6b)">
+            <span class="asset-type-tag">角色</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">沈砚 · 侠客</div><div class="am">《雾隐山河》· 2 引用</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:120px;background:linear-gradient(160deg,#3a261c,#6b3f2f)">
+            <span class="asset-type-tag">角色</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">裴云溪 · 女侠</div><div class="am">《雾隐山河》· 1 引用</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:120px;background:linear-gradient(160deg,#1c2636,#2f4a6b)">
+            <span class="asset-type-tag">角色</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">陆烬 · 对手</div><div class="am">《雾隐山河》· 3 引用</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:120px;background:linear-gradient(160deg,#241b3a,#3b2b66)">
+            <span class="asset-type-tag">角色</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">赛博侠客 Alpha</div><div class="am">《赛博红尘》· 2 引用</div></div>
+        </div>
+      </div>
+
+      <!-- 场景资产 -->
+      <div class="section-head">
+        <h3>场景</h3><span class="cnt">18</span><span class="more">全部 →</span>
+      </div>
+      <div class="asset-grid">
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:100px;background:linear-gradient(160deg,#2b3a2f,#5a6b3e)">
+            <span class="asset-type-tag">场景</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">雾隐山 · 顶峰</div><div class="am">国风山水 · 360°</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:100px;background:linear-gradient(160deg,#3a2b22,#6b4a3e)">
+            <span class="asset-type-tag">场景</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">古镇客栈 · 夜雨</div><div class="am">古风室内 · 标准</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:100px;background:linear-gradient(160deg,#1c1f2b,#2f3f6b)">
+            <span class="asset-type-tag">场景</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">霓虹街道 · 雨夜</div><div class="am">赛博朋克 · 360°</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:100px;background:linear-gradient(160deg,#1c2b22,#2f6b4a)">
+            <span class="asset-type-tag">场景</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">竹林山道 · 晨雾</div><div class="am">国风自然 · 标准</div></div>
+        </div>
+      </div>
+
+      <!-- 音乐资产 -->
+      <div class="section-head">
+        <h3>音乐 / 音效</h3><span class="cnt">8</span><span class="more">全部 →</span>
+      </div>
+      <div class="asset-grid">
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:80px;background:linear-gradient(135deg,#1e2028,#2a2d3e);display:grid;place-items:center">
+            <span style="font-size:28px">🎵</span><span class="asset-type-tag">BGM</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">故里山河</div><div class="am">古风 · 2:34</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:80px;background:linear-gradient(135deg,#1e2028,#2a2d3e);display:grid;place-items:center">
+            <span style="font-size:28px">🎵</span><span class="asset-type-tag">BGM</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">赛博夜曲</div><div class="am">电子 · 3:12</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:80px;background:linear-gradient(135deg,#1e2028,#2a2d3e);display:grid;place-items:center">
+            <span style="font-size:28px">🔊</span><span class="asset-type-tag">音效</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">剑鸣 · 长</div><div class="am">音效 · 0:04</div></div>
+        </div>
+        <div class="asset-card">
+          <div class="asset-thumb" style="height:80px;background:linear-gradient(135deg,#1e2028,#2a2d3e);display:grid;place-items:center">
+            <span style="font-size:28px">🎙</span><span class="asset-type-tag">配音</span><span class="at-check">✓</span>
+          </div>
+          <div class="asset-body"><div class="an">沈砚声线 v2</div><div class="am">男声 · 低沉</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 模板 tab ===== -->
+    <div class="tab-content" id="tab-templates">
+      <div class="toolbar">
+        <div class="search-box"><span style="color:var(--muted)">⌕</span><input placeholder="搜索模板…" /></div>
+        <div class="filter-chips">
+          <span class="fchip active">全部</span>
+          <span class="fchip">国风</span>
+          <span class="fchip">赛博朋克</span>
+          <span class="fchip">写实</span>
+          <span class="fchip">我保存的</span>
+        </div>
+      </div>
+      <div class="tpl-grid">
+        <div class="tpl-card">
+          <div class="tpl-thumb" style="background:linear-gradient(135deg,#2b3a2f,#5a6b3e 55%,#9aa45a)"></div>
+          <div class="tpl-body">
+            <div class="tn">古风武侠 · 经典</div>
+            <div class="tm"><span>国风 · 18 节点</span><button class="use-btn" onclick="showToast('已应用模板')">使用</button></div>
+          </div>
+        </div>
+        <div class="tpl-card">
+          <div class="tpl-thumb" style="background:linear-gradient(135deg,#241b3a,#3b2b66 50%,#b65cc9)"></div>
+          <div class="tpl-body">
+            <div class="tn">赛博双城 · 快节奏</div>
+            <div class="tm"><span>赛博朋克 · 22 节点</span><button class="use-btn" onclick="showToast('已应用模板')">使用</button></div>
+          </div>
+        </div>
+        <div class="tpl-card">
+          <div class="tpl-thumb" style="background:linear-gradient(135deg,#1c2b3a,#2f5a6b 60%,#5aa49a)"></div>
+          <div class="tpl-body">
+            <div class="tn">都市情感 · 短平快</div>
+            <div class="tm"><span>写实 · 14 节点</span><button class="use-btn" onclick="showToast('已应用模板')">使用</button></div>
+          </div>
+        </div>
+        <div class="tpl-card">
+          <div class="tpl-thumb" style="background:linear-gradient(135deg,#2f2a1c,#6b5a2f 55%,#c9b45c)"></div>
+          <div class="tpl-body">
+            <div class="tn">历史正剧 · 精品</div>
+            <div class="tm"><span>古风 · 30 节点</span><button class="use-btn" onclick="showToast('已应用模板')">使用</button></div>
+          </div>
+        </div>
+        <div class="tpl-card">
+          <div class="tpl-thumb" style="background:linear-gradient(135deg,#2b242f,#4a3b6b 60%,#7a5cc9)"></div>
+          <div class="tpl-body">
+            <div class="tn">科幻星际 · 宏大叙事</div>
+            <div class="tm"><span>科幻 · 26 节点</span><button class="use-btn" onclick="showToast('已应用模板')">使用</button></div>
+          </div>
+        </div>
+        <div class="tpl-card" style="border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:180px;color:var(--muted);cursor:pointer" onclick="showToast('从当前项目保存为模板')">
+          <span style="font-size:28px">＋</span>
+          <span style="font-size:13px">保存为模板</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 充值弹窗 -->
+<div class="modal-overlay" id="recharge-modal">
+  <div class="modal-box">
+    <div class="modal-hd"><span>购买积分</span><button class="modal-close" onclick="closeModal('recharge-modal')">✕</button></div>
+    <div class="credits-display">💎 当前：<b>1,280 积分</b></div>
+    <div class="pkg-grid">
+      <div class="pkg"><div class="pkg-ic">🪙</div><div class="pkg-cr">500 积分</div><div class="pkg-pr">¥ 9.9</div></div>
+      <div class="pkg active"><div class="pkg-ic">💎</div><div class="pkg-cr">2,000 积分</div><div class="pkg-pr">¥ 29.9 <span class="best">推荐</span></div></div>
+      <div class="pkg"><div class="pkg-ic">💠</div><div class="pkg-cr">6,000 积分</div><div class="pkg-pr">¥ 79.9</div></div>
+      <div class="pkg"><div class="pkg-ic">🔷</div><div class="pkg-cr">15,000 积分</div><div class="pkg-pr">¥ 179.9</div></div>
+    </div>
+    <button class="btn-go" style="width:100%;justify-content:center;margin-top:18px" onclick="showToast('跳转支付…');closeModal('recharge-modal')">立即购买 →</button>
+  </div>
+</div>
+<!-- 设置弹窗 -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-box" style="max-width:460px">
+    <div class="modal-hd"><span>设置</span><button class="modal-close" onclick="closeModal('settings-modal')">✕</button></div>
+    <div class="set-section">
+      <div class="set-row"><span class="set-lb">界面语言</span><select class="set-sel"><option>简体中文</option><option>English</option></select></div>
+      <div class="set-row"><span class="set-lb">默认风格</span><select class="set-sel"><option>国风</option><option>赛博朋克</option><option>写实</option><option>古风</option></select></div>
+      <div class="set-row"><span class="set-lb">默认比例</span><select class="set-sel"><option>9:16 竖屏</option><option>16:9 横屏</option><option>1:1 方形</option></select></div>
+      <div class="set-row"><span class="set-lb">生成后端</span><select class="set-sel"><option>人在环</option><option>真实 API</option><option>样例模式</option></select></div>
+      <div class="set-row"><span class="set-lb">通知</span><label class="toggle"><input type="checkbox" checked /><span class="tr"></span></label></div>
+      <div class="set-row"><span class="set-lb">自动保存</span><label class="toggle"><input type="checkbox" checked /><span class="tr"></span></label></div>
+    </div>
+    <button class="btn-go" style="width:100%;justify-content:center;margin-top:18px" onclick="showToast('设置已保存');closeModal('settings-modal')">保存</button>
+  </div>
+</div>
+
+<script>
+  function showToast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add('show')); setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),260); },2400); }
+  function showModal(id){ document.getElementById(id).classList.add('open'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+  // Tab 切换
+  document.getElementById('tabs').addEventListener('click', (e) => {
+    const tb = e.target.closest('.tab'); if (!tb) return;
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+    tb.classList.add('active');
+    document.getElementById('tab-' + tb.dataset.tab).classList.add('active');
+  });
+
+  // 资产类型 tab
+  document.getElementById('cat-tabs').addEventListener('click', (e) => {
+    const ct = e.target.closest('.cat-tab'); if (!ct) return;
+    document.querySelectorAll('.cat-tab').forEach(x => x.classList.remove('active'));
+    ct.classList.add('active');
+  });
+
+  // 作品筛选 chip
+  document.querySelectorAll('.filter-chips .fchip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.closest('.filter-chips').querySelectorAll('.fchip').forEach(x => x.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+
+  // 用户区 popup hover 延迟防抖
+  (function(){
+    const wrap = document.querySelector('.nav-user-wrap');
+    const popup = document.querySelector('.user-popup');
+    let t;
+    wrap.addEventListener('mouseenter', () => { clearTimeout(t); popup.classList.add('open'); });
+    wrap.addEventListener('mouseleave', () => { t = setTimeout(() => popup.classList.remove('open'), 150); });
+    popup.addEventListener('mouseenter', () => clearTimeout(t));
+    popup.addEventListener('mouseleave', () => { t = setTimeout(() => popup.classList.remove('open'), 150); });
+  })();
+
+  // 积分充值
+  document.getElementById('recharge').addEventListener('click', (e) => {
+    e.stopPropagation(); showModal('recharge-modal');
+  });
+
+  // 积分套餐选中
+  document.querySelectorAll('.pkg').forEach(p => {
+    p.addEventListener('click', () => {
+      p.closest('.pkg-grid').querySelectorAll('.pkg').forEach(x => x.classList.remove('active'));
+      p.classList.add('active');
+    });
+  });
+
+  // popup 操作
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest('.popup-item[data-action]'); if (!item) return;
+    const a = item.dataset.action;
+    if (a === 'settings') showModal('settings-modal');
+    else if (a === 'docs') showToast('帮助文档 · 即将上线');
+    else if (a === 'tutorial') showToast('新手教程 · 即将上线');
+  });
+
+  // 模态框点背景关闭
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+  });
+
+  // 通用跳转
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-go]'); if (!g) return;
+    const href = g.getAttribute('data-go');
+    if (href && href !== '#') location.href = href;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(cuid())
+  name       String
+  email      String      @unique
+  role       String      @default("demo")
+  status     String      @default("active")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  workspaces Workspace[]
+  projects   Project[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String    @id @default(cuid())
+  ownerUserId String    @map("owner_user_id")
+  name        String
+  mode        String    @default("demo")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  owner       User      @relation(fields: [ownerUserId], references: [id])
+  projects    Project[]
+
+  @@index([ownerUserId])
+  @@map("workspaces")
+}
+
+model Project {
+  id              String           @id @default(cuid())
+  workspaceId     String           @map("workspace_id")
+  ownerUserId     String           @map("owner_user_id")
+  title           String
+  route           String           @unique
+  currentStage    String           @default("chat") @map("current_stage")
+  settings        Json             @default("{}")
+  status          String           @default("active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+  owner           User             @relation(fields: [ownerUserId], references: [id])
+  episodes        Episode[]
+  scriptDrafts    ScriptDraft[]
+  canvasDocument  CanvasDocument?
+  agentThreads    AgentThread[]
+
+  @@index([workspaceId, updatedAt])
+  @@index([ownerUserId])
+  @@map("projects")
+}
+
+model Episode {
+  id            String        @id @default(cuid())
+  projectId     String        @map("project_id")
+  title         String
+  order         Int
+  scriptVersion Int           @default(1) @map("script_version")
+  status        String        @default("draft")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  project       Project       @relation(fields: [projectId], references: [id])
+  scriptDrafts  ScriptDraft[]
+  scenes        Scene[]
+
+  @@unique([projectId, order])
+  @@index([projectId])
+  @@map("episodes")
+}
+
+model ScriptDraft {
+  id        String    @id @default(cuid())
+  projectId String    @map("project_id")
+  episodeId String?   @map("episode_id")
+  version   Int
+  content   String
+  source    String    @default("user")
+  lockedAt  DateTime? @map("locked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  project   Project   @relation(fields: [projectId], references: [id])
+  episode   Episode?  @relation(fields: [episodeId], references: [id])
+
+  @@unique([projectId, version])
+  @@index([episodeId])
+  @@map("script_drafts")
+}
+
+model Scene {
+  id              String   @id @default(cuid())
+  episodeId       String   @map("episode_id")
+  title           String
+  order           Int
+  locationAssetId String?  @map("location_asset_id")
+  status          String   @default("draft")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  episode         Episode  @relation(fields: [episodeId], references: [id])
+  shots           Shot[]
+
+  @@unique([episodeId, order])
+  @@index([episodeId, order])
+  @@map("scenes")
+}
+
+model Shot {
+  id          String   @id @default(cuid())
+  sceneId     String   @map("scene_id")
+  order       Int
+  description String
+  cameraJson  Json     @default("{}") @map("camera_json")
+  emotion     String?
+  duration    Int?
+  status      String   @default("draft")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  scene       Scene    @relation(fields: [sceneId], references: [id])
+
+  @@unique([sceneId, order])
+  @@index([sceneId, order])
+  @@map("shots")
+}
+
+model CanvasDocument {
+  id           String   @id @default(cuid())
+  projectId    String   @unique @map("project_id")
+  nodesJson    Json     @default("[]") @map("nodes_json")
+  edgesJson    Json     @default("[]") @map("edges_json")
+  viewportJson Json     @default("{}") @map("viewport_json")
+  version      Int      @default(1)
+  status       String   @default("active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  project      Project  @relation(fields: [projectId], references: [id])
+
+  @@map("canvas_documents")
+}
+
+model AgentThread {
+  id          String         @id @default(cuid())
+  projectId   String         @map("project_id")
+  mode        String         @default("demo")
+  status      String         @default("active")
+  focusType   String         @default("Project") @map("focus_type")
+  focusId     String?        @map("focus_id")
+  summary     String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  project     Project        @relation(fields: [projectId], references: [id])
+  messages    AgentMessage[]
+  events      AgentEvent[]
+
+  @@index([projectId])
+  @@map("agent_threads")
+}
+
+model AgentMessage {
+  id            String      @id @default(cuid())
+  threadId      String      @map("thread_id")
+  role          String
+  content       String
+  modelMetaJson Json        @default("{}") @map("model_meta_json")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  thread        AgentThread @relation(fields: [threadId], references: [id])
+
+  @@index([threadId])
+  @@map("agent_messages")
+}
+
+model AgentEvent {
+  id          String      @id @default(cuid())
+  threadId    String      @map("thread_id")
+  taskId      String?     @map("task_id")
+  eventType   String      @map("event_type")
+  actor       String
+  payloadJson Json        @default("{}") @map("payload_json")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  thread      AgentThread @relation(fields: [threadId], references: [id])
+
+  @@index([threadId, createdAt])
+  @@map("agent_events")
+}

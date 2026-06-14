@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.vite/
+.turbo/
+.next/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+uploads/
+tmp/
+temp/

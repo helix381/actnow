@@ -1,0 +1,92 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIGC-Platform Page Canvas</title>
+  <link rel="stylesheet" href="./design-system/theme.css" />
+</head>
+<body>
+  <main class="page">
+    <aside class="sidebar">
+      <div class="brand">Make-Prototype</div>
+      <a href="./弃用-workbench.html">风格工作台</a>
+      <a href="./弃用-canvas.html" aria-current="page">页面画布</a>
+      <a href="./弃用-wireframe.html">线框原型</a>
+      <a href="./弃用-index.html">高保真起点</a>
+    </aside>
+    <section class="surface">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Page relationship canvas</p>
+          <h1>页面关系画布</h1>
+          <p>frame、跳转、异常风险来自 design-model.json。改模型后可重新生成。</p>
+        </div>
+      </header>
+      <div class="canvas-board">
+        <article class="frame" style="left:40px;top:40px;width:220px;min-height:130px">
+          <h2>home</h2>
+          <p>首页/创作页</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">empty</span></div>
+        </article>
+        <article class="frame" style="left:330px;top:40px;width:220px;min-height:130px">
+          <h2>chat</h2>
+          <p>创意聊天台</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">loading</span></div>
+        </article>
+        <article class="frame" style="left:620px;top:40px;width:220px;min-height:130px">
+          <h2>canvas</h2>
+          <p>制作画布</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">generating</span> <span class="pill">failed</span></div>
+        </article>
+        <article class="frame" style="left:40px;top:270px;width:220px;min-height:130px">
+          <h2>assets</h2>
+          <p>资产节点</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">empty</span></div>
+        </article>
+        <article class="frame" style="left:330px;top:270px;width:220px;min-height:130px">
+          <h2>storyboard</h2>
+          <p>分镜脚本</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">error</span></div>
+        </article>
+        <article class="frame" style="left:620px;top:270px;width:220px;min-height:130px">
+          <h2>keyframes</h2>
+          <p>分镜图</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">generating</span></div>
+        </article>
+        <article class="frame" style="left:910px;top:270px;width:220px;min-height:130px">
+          <h2>videos</h2>
+          <p>视频片段</p>
+          <div class="status-list"><span class="pill">waiting_upload</span> <span class="pill">completed</span> <span class="pill">failed</span></div>
+        </article>
+        <article class="frame" style="left:910px;top:500px;width:220px;min-height:130px">
+          <h2>export</h2>
+          <p>合成导出</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">completed</span></div>
+        </article>
+        <aside class="note" style="left:610px;top:500px;width:240px;min-height:120px">
+          <h2>人在环</h2>
+          <p>导出提示词包 -&gt; 外部生成 -&gt; 回传绑定 task_id</p>
+        </aside>
+        <div class="flow-line" style="left:260px;top:105.0px;width:70.0px;transform:rotate(0.0deg)"></div>
+        <div class="flow-label" style="left:265.0px;top:87.0px">开始创作</div>
+        <div class="flow-line" style="left:550px;top:105.0px;width:70.0px;transform:rotate(0.0deg)"></div>
+        <div class="flow-label" style="left:555.0px;top:87.0px">确认剧本</div>
+        <div class="flow-line" style="left:840px;top:105.0px;width:832.4061508662703px;transform:rotate(163.96005669395035deg)"></div>
+        <div class="flow-label" style="left:410.0px;top:202.0px">编辑资产</div>
+        <div class="flow-line" style="left:260px;top:335.0px;width:70.0px;transform:rotate(0.0deg)"></div>
+        <div class="flow-label" style="left:265.0px;top:317.0px">资产确认</div>
+        <div class="flow-line" style="left:550px;top:335.0px;width:70.0px;transform:rotate(0.0deg)"></div>
+        <div class="flow-label" style="left:555.0px;top:317.0px">生成分镜图</div>
+        <div class="flow-line" style="left:550px;top:335.0px;width:360.0px;transform:rotate(0.0deg)"></div>
+        <div class="flow-label" style="left:700.0px;top:317.0px">跳过关键帧</div>
+        <div class="flow-line" style="left:840px;top:335.0px;width:70.0px;transform:rotate(0.0deg)"></div>
+        <div class="flow-label" style="left:845.0px;top:317.0px">关键帧确认</div>
+        <div class="flow-line" style="left:1130px;top:335.0px;width:318.27660925679095px;transform:rotate(133.7269699799433deg)"></div>
+        <div class="flow-label" style="left:990.0px;top:432.0px">片段完成</div>
+      </div>
+    </section>
+  </main>
+  <script src="./design-system/prototype.js"></script>
+</body>
+</html>

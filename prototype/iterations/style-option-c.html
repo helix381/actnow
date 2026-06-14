@@ -1,0 +1,49 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Studio</title>
+  <link rel="stylesheet" href="../design-system/theme.css" />
+</head>
+<body>
+  <main class="page data-studio">
+    <aside class="sidebar">
+      <div class="brand">Make-Prototype</div>
+      <a href="../弃用-workbench.html">风格工作台</a>
+      <a href="../弃用-canvas.html">页面画布</a>
+      <a href="../弃用-wireframe.html">线框原型</a>
+      <a href="../弃用-index.html">高保真起点</a>
+    </aside>
+    <section class="surface">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Style option</p>
+          <h1>Data Studio</h1>
+          <p>适合监控、任务队列、生成成本和进度分析。</p>
+        </div>
+        <button data-open="../弃用-canvas.html">对照页面画布</button>
+      </header>
+      <div class="grid">
+        <article class="panel">
+          <h2>创作入口</h2>
+          <textarea placeholder="一句灵感起步，或粘贴/上传剧本"></textarea>
+          <div class="toolbar"><button>上传</button><button>开始</button></div>
+        </article>
+        <article class="panel">
+          <h2>制作状态</h2>
+          <div class="node done">拆资产</div>
+          <div class="node active">分镜脚本</div>
+          <div class="node">分镜图</div>
+          <div class="node">视频片段</div>
+        </article>
+        <article class="panel">
+          <h2>Agent</h2>
+          <p>已定位当前项目、第三场、镜头 08。可对话修改并只重跑目标镜头。</p>
+        </article>
+      </div>
+    </section>
+  </main>
+  <script src="../design-system/prototype.js"></script>
+</body>
+</html>

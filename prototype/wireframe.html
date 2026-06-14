@@ -1,0 +1,89 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIGC-Platform Wireframe</title>
+  <link rel="stylesheet" href="./design-system/theme.css" />
+</head>
+<body>
+  <main class="page">
+    <aside class="sidebar">
+      <div class="brand">Make-Prototype</div>
+      <a href="./弃用-workbench.html">风格工作台</a>
+      <a href="./弃用-canvas.html">页面画布</a>
+      <a href="./弃用-wireframe.html" aria-current="page">线框原型</a>
+      <a href="./弃用-index.html">高保真起点</a>
+    </aside>
+    <section class="surface">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Wireframe</p>
+          <h1>线框原型</h1>
+          <p>用于确认信息结构、状态和主操作，不作为最终视觉稿。</p>
+        </div>
+        <button data-open="./弃用-index.html">进入高保真起点</button>
+      </header>
+      <div class="grid">
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>首页/创作页</h2>
+          <p>开始创作</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">empty</span></div>
+          <div class="toolbar"><button class="secondary">输入</button> <button class="secondary">上传</button> <button class="secondary">开始</button></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>创意聊天台</h2>
+          <p>灵感到剧本</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">loading</span></div>
+          <div class="toolbar"><button class="secondary">发送</button> <button class="secondary">确认剧本</button></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>制作画布</h2>
+          <p>制作主界面</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">generating</span> <span class="pill">failed</span></div>
+          <div class="toolbar"><button class="secondary">编辑</button> <button class="secondary">生成</button> <button class="secondary">重试</button></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>资产节点/资产库</h2>
+          <p>管理角色场景道具</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">empty</span></div>
+          <div class="toolbar"><button class="secondary">上传</button> <button class="secondary">编辑</button> <button class="secondary">入库</button></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>分镜脚本节点</h2>
+          <p>校对分镜</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">error</span></div>
+          <div class="toolbar"><button class="secondary">改字段</button> <button class="secondary">调序</button> <button class="secondary">重生</button></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>分镜图节点</h2>
+          <p>关键帧预览</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">generating</span></div>
+          <div class="toolbar"><button class="secondary">批量生成</button> <button class="secondary">单张重生</button></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>视频片段节点</h2>
+          <p>管理片段</p>
+          <div class="status-list"><span class="pill">waiting_upload</span> <span class="pill">completed</span> <span class="pill">failed</span></div>
+          <div class="toolbar"><button class="secondary">回填</button> <button class="secondary">重试</button> <button class="secondary">变速</button></div>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">P0</p>
+          <h2>合成导出节点</h2>
+          <p>导出成片</p>
+          <div class="status-list"><span class="pill">default</span> <span class="pill">completed</span></div>
+          <div class="toolbar"><button class="secondary">预览</button> <button class="secondary">导出</button></div>
+        </article>
+      </div>
+    </section>
+  </main>
+  <script src="./design-system/prototype.js"></script>
+</body>
+</html>

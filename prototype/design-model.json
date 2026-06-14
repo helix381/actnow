@@ -1,0 +1,405 @@
+﻿{
+  "meta": {
+    "productName": "AIGC-Platform",
+    "productType": "Web应用",
+    "created": "2026-06-10",
+    "source": "Make-Prototype",
+    "confirmation": {
+      "referenceIntake": "confirmed",
+      "visualStyle": "confirmed",
+      "pageMap": "confirmed",
+      "flow": "confirmed",
+      "wireframe": "pending",
+      "highFidelity": "pending"
+    }
+  },
+  "canvas": {
+    "width": 1280,
+    "height": 820,
+    "background": "#0d0e12",
+    "grid": 28,
+    "frameDefault": {
+      "width": 220,
+      "height": 130
+    }
+  },
+  "tokens": {
+    "colors": {
+      "background": "#0d0e12",
+      "surface": "#16181f",
+      "surface2": "#1e2027",
+      "foreground": "#f3f4f7",
+      "muted": "#9aa1ad",
+      "line": "#2b2e38",
+      "primary": "#5b78ff",
+      "accent": "#34d8b4",
+      "danger": "#ff5d6c",
+      "warning": "#f2b657",
+      "elevated": "#23262f",
+      "onPrimary": "#0b1020",
+      "groups": {
+        "asset": "#b9a8e6",
+        "storyboard": "#9cc2ec",
+        "keyframe": "#7fdcc4",
+        "video": "#f4b78f",
+        "compose": "#e6a6bd"
+      },
+      "gradientOrb": ["#a7e5d3", "#f4c5a8", "#c8b8e0", "#a8c8e8"]
+    },
+    "fonts": {
+      "sans": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "display": "Inter, ui-sans-serif, system-ui",
+      "mono": "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+    },
+    "spacing": {
+      "unit": 8,
+      "panel": 16,
+      "section": 32,
+      "hero": 80
+    },
+    "radius": {
+      "panel": 12,
+      "button": 10,
+      "node": 8,
+      "thumb": 6,
+      "pill": 999
+    },
+    "motion": {
+      "duration": "180ms",
+      "ease": "cubic-bezier(.2,.8,.2,1)",
+      "properties": [
+        "transform",
+        "opacity"
+      ]
+    }
+  },
+  "constraints": {
+    "safeAreas": [
+      {
+        "x": 24,
+        "y": 24,
+        "width": 1232,
+        "height": 772
+      }
+    ],
+    "minFontSize": 12,
+    "bodyFontSize": 16,
+    "touchTarget": 44,
+    "maxTextLines": {
+      "button": 1,
+      "frame": 3,
+      "panel": 6
+    },
+    "forbidden": [
+      "clone third-party websites",
+      "reuse third-party brand assets",
+      "decorative-only motion",
+      "nested cards",
+      "text overlap"
+    ]
+  },
+  "pages": [
+    {
+      "id": "home",
+      "title": "首页/创作页",
+      "goal": "开始创作",
+      "priority": "P0",
+      "states": [
+        "default",
+        "empty"
+      ],
+      "primaryActions": [
+        "输入",
+        "上传",
+        "开始"
+      ]
+    },
+    {
+      "id": "chat",
+      "title": "创意聊天台",
+      "goal": "灵感到剧本",
+      "priority": "P0",
+      "states": [
+        "default",
+        "loading"
+      ],
+      "primaryActions": [
+        "发送",
+        "确认剧本"
+      ]
+    },
+    {
+      "id": "canvas",
+      "title": "制作画布",
+      "goal": "制作主界面",
+      "priority": "P0",
+      "states": [
+        "default",
+        "generating",
+        "failed"
+      ],
+      "primaryActions": [
+        "编辑",
+        "生成",
+        "重试"
+      ]
+    },
+    {
+      "id": "assets",
+      "title": "资产节点/资产库",
+      "goal": "管理角色场景道具",
+      "priority": "P0",
+      "states": [
+        "default",
+        "empty"
+      ],
+      "primaryActions": [
+        "上传",
+        "编辑",
+        "入库"
+      ]
+    },
+    {
+      "id": "storyboard",
+      "title": "分镜脚本节点",
+      "goal": "校对分镜",
+      "priority": "P0",
+      "states": [
+        "default",
+        "error"
+      ],
+      "primaryActions": [
+        "改字段",
+        "调序",
+        "重生"
+      ]
+    },
+    {
+      "id": "keyframes",
+      "title": "分镜图节点",
+      "goal": "关键帧预览",
+      "priority": "P0",
+      "states": [
+        "default",
+        "generating"
+      ],
+      "primaryActions": [
+        "批量生成",
+        "单张重生"
+      ]
+    },
+    {
+      "id": "videos",
+      "title": "视频片段节点",
+      "goal": "管理片段",
+      "priority": "P0",
+      "states": [
+        "waiting_upload",
+        "completed",
+        "failed"
+      ],
+      "primaryActions": [
+        "回填",
+        "重试",
+        "变速"
+      ]
+    },
+    {
+      "id": "export",
+      "title": "合成导出节点",
+      "goal": "导出成片",
+      "priority": "P0",
+      "states": [
+        "default",
+        "completed"
+      ],
+      "primaryActions": [
+        "预览",
+        "导出"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "home_to_chat",
+      "from": "home",
+      "to": "chat",
+      "trigger": "开始创作",
+      "feedback": "进入对话",
+      "risk": "上传失败时留在 home"
+    },
+    {
+      "id": "chat_to_canvas",
+      "from": "chat",
+      "to": "canvas",
+      "trigger": "确认剧本",
+      "feedback": "进入制作画布",
+      "risk": "剧本不完整时进入待确认"
+    },
+    {
+      "id": "canvas_to_assets",
+      "from": "canvas",
+      "to": "assets",
+      "trigger": "编辑资产",
+      "feedback": "打开资产节点",
+      "risk": "缺引用时提示补齐"
+    },
+    {
+      "id": "assets_to_storyboard",
+      "from": "assets",
+      "to": "storyboard",
+      "trigger": "资产确认",
+      "feedback": "进入分镜脚本",
+      "risk": "角色形态缺失时阻断"
+    },
+    {
+      "id": "storyboard_to_keyframes",
+      "from": "storyboard",
+      "to": "keyframes",
+      "trigger": "生成分镜图",
+      "feedback": "显示生成进度",
+      "risk": "部分失败允许单张重试"
+    },
+    {
+      "id": "storyboard_to_videos",
+      "from": "storyboard",
+      "to": "videos",
+      "trigger": "跳过关键帧",
+      "feedback": "进入片段生成",
+      "risk": "提示质量风险"
+    },
+    {
+      "id": "keyframes_to_videos",
+      "from": "keyframes",
+      "to": "videos",
+      "trigger": "关键帧确认",
+      "feedback": "进入视频片段",
+      "risk": "外部工具回传需绑定 task_id"
+    },
+    {
+      "id": "videos_to_export",
+      "from": "videos",
+      "to": "export",
+      "trigger": "片段完成",
+      "feedback": "进入合成导出",
+      "risk": "缺片段时进入待回传"
+    }
+  ],
+  "elements": [
+    {
+      "id": "frame_home",
+      "type": "frame",
+      "pageId": "home",
+      "x": 40,
+      "y": 40,
+      "width": 220,
+      "height": 130,
+      "label": "home",
+      "summary": "首页/创作页"
+    },
+    {
+      "id": "frame_chat",
+      "type": "frame",
+      "pageId": "chat",
+      "x": 330,
+      "y": 40,
+      "width": 220,
+      "height": 130,
+      "label": "chat",
+      "summary": "创意聊天台"
+    },
+    {
+      "id": "frame_canvas",
+      "type": "frame",
+      "pageId": "canvas",
+      "x": 620,
+      "y": 40,
+      "width": 220,
+      "height": 130,
+      "label": "canvas",
+      "summary": "制作画布"
+    },
+    {
+      "id": "frame_assets",
+      "type": "frame",
+      "pageId": "assets",
+      "x": 40,
+      "y": 270,
+      "width": 220,
+      "height": 130,
+      "label": "assets",
+      "summary": "资产节点"
+    },
+    {
+      "id": "frame_storyboard",
+      "type": "frame",
+      "pageId": "storyboard",
+      "x": 330,
+      "y": 270,
+      "width": 220,
+      "height": 130,
+      "label": "storyboard",
+      "summary": "分镜脚本"
+    },
+    {
+      "id": "frame_keyframes",
+      "type": "frame",
+      "pageId": "keyframes",
+      "x": 620,
+      "y": 270,
+      "width": 220,
+      "height": 130,
+      "label": "keyframes",
+      "summary": "分镜图"
+    },
+    {
+      "id": "frame_videos",
+      "type": "frame",
+      "pageId": "videos",
+      "x": 910,
+      "y": 270,
+      "width": 220,
+      "height": 130,
+      "label": "videos",
+      "summary": "视频片段"
+    },
+    {
+      "id": "frame_export",
+      "type": "frame",
+      "pageId": "export",
+      "x": 910,
+      "y": 500,
+      "width": 220,
+      "height": 130,
+      "label": "export",
+      "summary": "合成导出"
+    },
+    {
+      "id": "note_hil",
+      "type": "note",
+      "x": 610,
+      "y": 500,
+      "width": 240,
+      "height": 120,
+      "label": "人在环",
+      "summary": "导出提示词包 -> 外部生成 -> 回传绑定 task_id"
+    }
+  ],
+  "exports": {
+    "html": [
+      "弃用-workbench.html",
+      "弃用-canvas.html",
+      "弃用-wireframe.html",
+      "弃用-index.html"
+    ],
+    "docs": [
+      "reference-intake.md",
+      "design-system/DESIGN.md",
+      "design-system/MASTER.md",
+      "visual-qa.md"
+    ],
+    "json": [
+      "design-model.json"
+    ]
+  }
+}

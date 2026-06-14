@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ActNow · 创意聊天台</title>
+  <link rel="stylesheet" href="../design-system/theme.css" />
+  <style>
+    body { overflow: hidden; }
+    .chat { height: 100vh; display: grid; grid-template-columns: 76px minmax(0,1fr) 68px; grid-template-rows: 100vh; overflow: hidden; }
+
+    /* Rail 收起态：icon + 文字标签竖排居中 */
+    .rail { background: #101117; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 8px; overflow: hidden; }
+    .rail .logo { width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg,var(--primary),#9b6bff); display: grid; place-items: center; font-weight: 800; color: #fff; font-size: 14px; cursor: pointer; margin-bottom: 14px; }
+    .rail .ri { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 60px; padding: 9px 6px; border-radius: 12px; color: var(--muted); cursor: pointer; transition: background var(--motion-duration) var(--motion-ease), color var(--motion-duration) var(--motion-ease); }
+    .rail .ri:hover { background: var(--surface); color: var(--foreground); }
+    .rail .ri.active { background: rgba(91,120,255,.14); color: var(--foreground); }
+    .rail .ri .ic { font-size: 18px; line-height: 1; }
+    .rail .ri .lb { font-size: 11px; letter-spacing: .01em; white-space: nowrap; }
+    .rail .sp { flex: 1; }
+    .rail .rail-user { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 10px; border-top: 1px solid var(--line); margin-top: 4px; width: 100%; }
+    .rail .rail-user .ava { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#34d8b4,#5b78ff); cursor: pointer; }
+    .rail .rail-user .cr { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.4; }
+
+    /* 对话区 */
+    .conv { display: flex; flex-direction: column; min-width: 0; position: relative; overflow: hidden; }
+    .c-top { height: 56px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 0 20px; background: rgba(16,17,23,.6); backdrop-filter: blur(8px); }
+    .c-top .ti { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+    .c-top .pj { font-size: 12px; color: var(--muted); }
+    .c-top .sp { flex: 1; }
+    .setpills { display: flex; gap: 6px; }
+    .setpills .sp2 { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+    .c-modes { display: flex; gap: 4px; }
+    .c-modes button { width: 30px; height: 30px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); cursor: pointer; min-height: 30px; padding: 0; font-size: 13px; }
+    .c-modes button.on { color: var(--foreground); border-color: var(--primary); }
+
+    .c-stream { flex: 1; overflow-y: auto; padding: 26px 8%; display: flex; flex-direction: column; gap: 20px; scrollbar-width: none; }
+    .c-stream::-webkit-scrollbar { display: none; }
+    .turn { display: flex; flex-direction: column; gap: 10px; max-width: 760px; width: 100%; margin: 0 auto; }
+    .bubble-ai { align-self: flex-start; max-width: 86%; }
+    .bubble-ai .who { font-size: 11px; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
+    .bubble-ai .who .dot { width: 18px; height: 18px; border-radius: 6px; background: linear-gradient(135deg,#34d8b4,#5b78ff); display: grid; place-items: center; font-size: 10px; color: #06202a; font-weight: 800; }
+    .bubble-ai .txt { font-size: 15px; line-height: 1.65; color: var(--foreground); }
+    .bubble-me { align-self: flex-end; max-width: 80%; background: var(--primary); color: #fff; border-radius: 16px 16px 4px 16px; padding: 11px 15px; font-size: 15px; line-height: 1.6; }
+    .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .opt { font-size: 13px; color: var(--foreground); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 15px; cursor: pointer; min-height: 38px; transition: transform var(--motion-duration) var(--motion-ease), border-color var(--motion-duration) var(--motion-ease); }
+    .opt:hover { transform: translateY(-1px); border-color: var(--primary); color: var(--foreground); }
+    .opt .k { color: var(--muted); margin-right: 5px; font-family: var(--font-mono); font-size: 11px; }
+    .opt.custom { border-style: dashed; color: var(--muted); }
+
+    .c-input { padding: 14px 8% 20px; }
+    .c-box { max-width: 760px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: 0 14px 40px rgba(0,0,0,.3); }
+    .c-box textarea { border: 0; background: transparent; resize: none; min-height: 46px; width: 100%; font-size: 15px; line-height: 1.5; color: var(--foreground); }
+    .c-box textarea:focus { outline: none; }
+    .c-box .row { display: flex; align-items: center; margin-top: 6px; gap: 8px; }
+    .c-box .tip { font-size: 11px; color: var(--muted); }
+    .c-box .send { margin-left: auto; background: var(--primary); border: 0; color: #fff; border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 650; min-height: 40px; cursor: pointer; }
+
+    /* 右侧草稿面板 */
+    .draft { border-left: 1px solid var(--line); background: #0f1015; display: flex; flex-direction: column; min-width: 0; }
+    .d-top { height: 56px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+    .d-tabs { display: flex; gap: 4px; }
+    .d-tabs button { font-size: 13px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px 12px; cursor: pointer; min-height: 32px; }
+    .d-tabs button.on { color: var(--foreground); background: var(--surface); border-color: var(--line); }
+    .d-top .live { margin-left: auto; font-size: 11px; color: var(--accent); display: inline-flex; align-items: center; gap: 6px; }
+    .d-top .live .i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 1.6s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    .d-body { flex: 1; overflow-y: auto; padding: 20px 18px; }
+    .d-title { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+    .d-log { font-size: 13px; color: var(--muted); margin: 8px 0 18px; line-height: 1.6; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+    .act { margin-bottom: 16px; }
+    .act .ah { font-size: 13px; font-weight: 650; color: var(--foreground); display: flex; align-items: center; gap: 8px; }
+    .act .ah .n { width: 20px; height: 20px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11px; color: var(--primary); font-weight: 700; }
+    .act .ad { font-size: 13px; color: var(--muted); line-height: 1.6; margin-top: 6px; padding-left: 28px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .tag { font-size: 11px; color: var(--foreground); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+
+    .d-foot { border-top: 1px solid var(--line); padding: 14px 16px; }
+    .ws-note { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+    .ws-note b { color: var(--warning); }
+    .confirm { width: 100%; background: var(--primary); border: 0; color: #fff; border-radius: 12px; padding: 13px; font-size: 15px; font-weight: 650; cursor: pointer; min-height: 48px; }
+    .confirm:hover { transform: translateY(-1px); }
+
+    .toast { position: fixed; left: 50%; bottom: 32px; transform: translate(-50%,12px); background: var(--elevated); border: 1px solid var(--line); color: var(--foreground); padding: 11px 18px; border-radius: 12px; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.5); opacity: 0; transition: opacity .2s, transform .2s; z-index: 50; }
+    .toast.show { opacity: 1; transform: translate(-50%,0); }
+
+    /* Agent 聊天两态（6e）：全屏（对话+草稿） / 悬浮窗 */
+    .chat.mode-pet { grid-template-columns: 76px minmax(0,1fr) 68px; }
+    .chat.mode-pet .conv { position: fixed; right: 90px; bottom: 22px; top: auto; left: auto; width: 372px; height: 540px; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 28px 70px rgba(0,0,0,.62); z-index: 40; background: #0f1015; overflow: hidden; }
+    .chat.mode-pet .c-stream { padding: 16px 16px; } .chat.mode-pet .c-input { padding: 12px 16px 16px; }
+
+    /* 大纲卡片（agent 气泡内）*/
+    .outline-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+    .outline-card .oc-hd { font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .outline-card .oc-log { font-size: 12px; color: var(--muted); line-height: 1.6; padding: 10px 12px; background: rgba(0,0,0,.2); border-radius: 9px; margin-bottom: 12px; }
+    .outline-card .oc-act { display: flex; gap: 10px; margin-bottom: 10px; }
+    .outline-card .oc-act:last-of-type { margin-bottom: 12px; }
+    .outline-card .oc-n { width: 22px; height: 22px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11px; color: var(--primary); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+    .outline-card .oc-body .oc-title { font-size: 13px; font-weight: 650; }
+    .outline-card .oc-body .oc-desc { font-size: 12px; color: var(--muted); line-height: 1.6; margin-top: 3px; }
+    .outline-card .oc-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+    .outline-card .oc-tag { font-size: 11px; color: var(--foreground); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+
+    /* 右侧对话时间轴 */
+    .timeline { background: #0a0b10; display: flex; flex-direction: column; align-items: center; padding: 16px 0 16px; position: relative; overflow: hidden; }
+    /* 中心轨道线 */
+    .tl-line { position: absolute; left: 50%; top: 48px; bottom: 56px; width: 2px; background: rgba(255,255,255,.07); border-radius: 2px; transform: translateX(-50%); }
+    /* 已完成段高亮 */
+    .tl-done-fill { position: absolute; left: 50%; top: 48px; width: 2px; background: var(--primary); border-radius: 2px; transform: translateX(-50%); opacity: .5; transition: height .3s; }
+    .tl-nodes { display: flex; flex-direction: column; align-items: center; gap: 0; flex: 1; width: 100%; position: relative; z-index: 1; justify-content: space-around; }
+    .tl-node { position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; width: 100%; padding: 10px 0; }
+    /* 节点圆 */
+    .tl-node .nd { width: 9px; height: 9px; border-radius: 50%; background: #2a2d38; border: 2px solid #3a3f50; transition: all .18s; flex-shrink: 0; }
+    /* 进度层（靛蓝，由状态机决定、不随滚动变）：done 已完成 / current 当前最高进度 */
+    .tl-node.done .nd { background: var(--primary); border-color: var(--primary); opacity: .6; }
+    .tl-node.current .nd { width: 12px; height: 12px; background: var(--primary); border-color: var(--primary); opacity: 1; }
+    /* 阅读游标层（青绿，随滚动套在"正在看"的节点外）*/
+    .tl-node.viewing .nd { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(52,216,180,.22), 0 0 0 7px rgba(52,216,180,.07); }
+    /* 仅已达成节点可点/可放大；pending 仅可 hover 看名 */
+    .tl-node:not(.done):not(.current) { cursor: default; }
+    .tl-node.done:hover .nd, .tl-node.current:hover .nd { transform: scale(1.18); }
+    /* hover 时右侧弹出 tooltip 标签 */
+    .tl-node .nl { position: absolute; right: calc(100% + 6px); top: 50%; transform: translateY(-50%);
+      background: #1e2028; border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px;
+      font-size: 11px; color: var(--foreground); white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity .15s; box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+    .tl-node:hover .nl { opacity: 1; }
+    .tl-node.current .nl { opacity: 1; color: var(--primary); }   /* 进度标签常驻（靛蓝）*/
+    .tl-node.viewing .nl { opacity: 1; color: var(--accent); }    /* 阅读游标标签常驻（青绿）*/
+    /* 确认按钮 */
+    .tl-confirm { margin-top: 8px; width: 40px; background: var(--primary); border: 0; color: #fff; border-radius: 10px; padding: 7px 3px; font-size: 10px; font-weight: 650; cursor: pointer; line-height: 1.5; text-align: center; flex-shrink: 0; }
+    .tl-confirm:hover { opacity: .88; transform: scale(1.04); }
+
+    @media (max-width: 980px) { .chat { grid-template-columns: 1fr !important; } .rail, .timeline { display: none; } .c-stream, .c-input { padding-left: 5%; padding-right: 5%; } }
+  </style>
+</head>
+<body>
+  <div class="chat mode-full">
+    <aside class="rail">
+      <div class="logo" data-go="./home.html">A</div>
+      <div class="ri active" data-go="./home.html"><span class="ic">✦</span><span class="lb">创作</span></div>
+      <div class="ri" data-go="./myworks.html"><span class="ic">◷</span><span class="lb">我的创作</span></div>
+      <div class="sp"></div>
+      <div class="rail-user">
+        <div class="ava" title="玩家_创作者"></div>
+        <div class="cr">💎<br/>1,280</div>
+      </div>
+    </aside>
+
+    <!-- 对话区 -->
+    <section class="conv">
+      <header class="c-top">
+        <div><div class="ti">创意聊天台</div></div>
+        <div class="pj">· 新项目 · 灵感探索</div>
+        <span class="sp"></span>
+        <div class="setpills">
+          <span class="sp2">国风</span><span class="sp2">9:16</span><span class="sp2">1–3min</span>
+        </div>
+        <div class="c-modes">
+          <button title="全屏（对话+草稿）" class="on" data-mode="full">⛶</button><button title="悬浮窗（最小化聊天）" data-mode="pet">◔</button>
+        </div>
+      </header>
+
+      <div class="c-stream" id="stream">
+        <div class="turn">
+          <div class="bubble-ai">
+            <div class="who"><span class="dot">编</span> 编剧 Agent</div>
+            <div class="txt">我们先发散一下。你想做一个什么样的故事？说一句灵感就行，也可以从下面挑一个方向起步。</div>
+          </div>
+          <div class="opts">
+            <button class="opt"><span class="k">A</span>国风武侠</button>
+            <button class="opt"><span class="k">B</span>民国谍战</button>
+            <button class="opt"><span class="k">C</span>都市悬疑</button>
+            <button class="opt"><span class="k">D</span>科幻末世</button>
+            <button class="opt custom">✎ 自己描述</button>
+          </div>
+        </div>
+
+        <div class="turn">
+          <div class="bubble-me">国风武侠，一个少年背负家族血仇上山学艺</div>
+        </div>
+
+        <div class="turn">
+          <div class="bubble-ai">
+            <div class="who"><span class="dot">编</span> 编剧 Agent</div>
+            <div class="txt">经典又有张力的母题。核心冲突你想往哪个方向收？这决定整部戏的情绪基调。</div>
+          </div>
+          <div class="opts">
+            <button class="opt"><span class="k">1</span>复仇与宽恕</button>
+            <button class="opt"><span class="k">2</span>师门背叛</button>
+            <button class="opt"><span class="k">3</span>天下大义 vs 私仇</button>
+          </div>
+        </div>
+
+        <div class="turn">
+          <div class="bubble-me">复仇与宽恕——仇人竟是授业恩师</div>
+        </div>
+
+        <div class="turn" id="turn-outline">
+          <div class="bubble-ai">
+            <div class="who"><span class="dot">编</span> 编剧 Agent</div>
+            <div class="txt">这个反转足够撑起三幕。已经帮你发散成完整三幕大纲——可以直接说「第二幕再压抑些」「结局改成宽恕」来调整，满意后点右侧「确认剧本」进入制作。</div>
+            <div class="outline-card">
+              <div class="oc-hd">📋 《雾隐山河》· 三幕大纲</div>
+              <div class="oc-log">少年沈砚为复家族血仇上雾隐山学艺，三年后却发现——下令灭门的，正是授业恩师。复仇与师恩在雾隐山巅交锋。</div>
+              <div class="oc-act">
+                <span class="oc-n">壹</span>
+                <div class="oc-body"><div class="oc-title">第一幕 · 上山</div><div class="oc-desc">血夜灭门，少年沈砚怀着家传残刀逃入雾隐山；机缘拜入剑宗门下，立誓三年学成下山复仇。</div></div>
+              </div>
+              <div class="oc-act">
+                <span class="oc-n">贰</span>
+                <div class="oc-body"><div class="oc-title">第二幕 · 学艺与裂痕</div><div class="oc-desc">沈砚渐知江湖旧事，师父待他如子，却在一桩旧案里露出破绽；情义与仇恨开始撕扯。</div></div>
+              </div>
+              <div class="oc-act">
+                <span class="oc-n">叁</span>
+                <div class="oc-body"><div class="oc-title">第三幕 · 雾隐山巅</div><div class="oc-desc">真相揭穿，师徒雾隐山巅对决；沈砚在举刀的一瞬，要在「复仇」与「宽恕」之间做出选择。</div></div>
+              </div>
+              <div class="oc-tags"><span class="oc-tag">隐忍</span><span class="oc-tag">渐疑</span><span class="oc-tag">撕扯</span><span class="oc-tag">爆发</span><span class="oc-tag">留白</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="c-input">
+        <div class="c-box">
+          <textarea id="idea" placeholder="继续和编剧 Agent 对话调整剧情，例如「把第二幕的师徒情写得更克制」…"></textarea>
+          <div class="row">
+            <span class="tip">AI 先发散给你选项，再帮你收敛成剧本</span>
+            <button class="send" id="send">发送</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右侧对话时间轴 -->
+    <aside class="timeline">
+      <div class="tl-line"></div>
+      <div class="tl-done-fill" id="tl-fill"></div>
+      <div class="tl-nodes" id="tl-nodes">
+        <div class="tl-node done" data-turn="turn-0"><div class="nd"></div><span class="nl">灵感</span></div>
+        <div class="tl-node done" data-turn="turn-2"><div class="nd"></div><span class="nl">方向</span></div>
+        <div class="tl-node current" data-turn="turn-outline"><div class="nd"></div><span class="nl">大纲</span></div>
+        <div class="tl-node" data-turn=""><div class="nd"></div><span class="nl">剧本</span></div>
+        <div class="tl-node" data-turn=""><div class="nd"></div><span class="nl">角色</span></div>
+        <div class="tl-node" data-turn=""><div class="nd"></div><span class="nl">确认</span></div>
+      </div>
+      <button class="tl-confirm" id="confirm">确认<br/>剧本</button>
+    </aside>
+  </div>
+
+  <script>
+    function showToast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); requestAnimationFrame(()=>t.classList.add('show')); setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),260); },2400); }
+    const stream = document.getElementById('stream');
+    function addMe(text){
+      const turn=document.createElement('div'); turn.className='turn';
+      turn.innerHTML=`<div class="bubble-me">${text}</div>`;
+      stream.appendChild(turn);
+      const reply=document.createElement('div'); reply.className='turn';
+      reply.innerHTML=`<div class="bubble-ai"><div class="who"><span class="dot">编</span> 编剧 Agent</div><div class="txt">已根据你的选择更新右侧草稿。可以继续调整，或点「确认剧本」进入制作。</div></div>`;
+      stream.appendChild(reply);
+      stream.scrollTop = stream.scrollHeight;
+    }
+    document.getElementById('stream').addEventListener('click', (e) => {
+      const o = e.target.closest('.opt'); if(!o) return;
+      if(o.classList.contains('custom')){ document.getElementById('idea').focus(); return; }
+      addMe(o.textContent.replace(/^[A-D0-9]\s*/, '').trim());
+    });
+    document.getElementById('send').addEventListener('click', () => {
+      const ta=document.getElementById('idea'); const v=ta.value.trim(); if(!v) return; addMe(v); ta.value='';
+    });
+    // 给对话 turn 加 id 锚点
+    const turns = stream.querySelectorAll('.turn');
+    turns.forEach((t, i) => { if(!t.id) t.id = 'turn-' + i; });
+
+    // 计算 done-fill 高度：第一个节点到 current 节点的距离
+    requestAnimationFrame(() => {
+      const nodesEl = document.getElementById('tl-nodes');
+      const fillEl = document.getElementById('tl-fill');
+      const allNodes = nodesEl.querySelectorAll('.tl-node');
+      const currentNode = nodesEl.querySelector('.tl-node.current');
+      if (currentNode && allNodes.length) {
+        const first = allNodes[0].getBoundingClientRect();
+        const cur = currentNode.getBoundingClientRect();
+        const containerTop = nodesEl.closest('.timeline').getBoundingClientRect().top;
+        fillEl.style.top = (first.top + first.height/2 - containerTop) + 'px';
+        fillEl.style.height = (cur.top + cur.height/2 - first.top - first.height/2) + 'px';
+      }
+    });
+
+    // 阅读游标：滚动到哪个阶段的聊天记录，对应节点亮青绿环（独立于进度层）
+    (function(){
+      const stream = document.getElementById('stream');
+      const tlNodes = Array.from(document.querySelectorAll('.tl-node'));
+      const items = tlNodes.filter(n => n.dataset.turn)
+        .map(n => ({ node: n, anchor: document.getElementById(n.dataset.turn) }))
+        .filter(x => x.anchor);
+      function setViewing(node){ tlNodes.forEach(n => n.classList.remove('viewing')); if(node) node.classList.add('viewing'); }
+      let ticking = false;
+      function update(){
+        ticking = false;
+        const refY = stream.getBoundingClientRect().top + 100; // 视口顶部下方 100px 的参考线
+        let active = items[0];
+        for(const it of items){ if(it.anchor.getBoundingClientRect().top <= refY) active = it; }
+        if(active) setViewing(active.node);
+      }
+      stream.addEventListener('scroll', () => { if(!ticking){ ticking = true; requestAnimationFrame(update); } });
+      update();
+    })();
+
+    // 时间轴节点点击跳转
+    document.querySelector('.timeline').addEventListener('click', (e) => {
+      const node = e.target.closest('.tl-node[data-turn]');
+      if (!node || !node.dataset.turn) return;
+      const target = document.getElementById(node.dataset.turn);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    document.querySelector('.c-modes').addEventListener('click', (e) => { const b=e.target.closest('button'); if(!b) return; b.parentElement.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); const chat=document.querySelector('.chat'); chat.classList.remove('mode-full','mode-pet'); chat.classList.add('mode-'+(b.dataset.mode||'full')); });
+    document.getElementById('confirm').addEventListener('click', () => { showToast('剧本已确认 · 正在拆分并进入制作画布…'); setTimeout(()=>location.href='./studio.html', 900); });
+    document.addEventListener('click', (e) => { const g=e.target.closest('[data-go]'); if(g){ const h=g.getAttribute('data-go'); if(h&&h!=='#') location.href=h; } });
+  </script>
+</body>
+</html>
