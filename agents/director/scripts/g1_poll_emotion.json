@@ -1,0 +1,12 @@
+{
+  "script_id": "g1_poll_emotion",
+  "trigger": "input_grade == 'C' && user_has_no_positive_direction",
+  "response_type": "quick_poll",
+  "question": "你最想让观众看完是什么感受？",
+  "options": [
+    { "id": "A", "label": "解恨爽" },
+    { "id": "B", "label": "甜到上头" },
+    { "id": "C", "label": "虐但值了" },
+    { "id": "D", "label": "悬停不下来" }
+  ]
+}

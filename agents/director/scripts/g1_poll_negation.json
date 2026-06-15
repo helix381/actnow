@@ -1,0 +1,12 @@
+{
+  "script_id": "g1_poll_negation",
+  "trigger": "input_grade == 'C' && user_input_is_negation_only",
+  "response_type": "quick_poll",
+  "question": "那你更想要——",
+  "options": [
+    { "id": "A", "label": "打脸解恨" },
+    { "id": "B", "label": "悬疑反转" },
+    { "id": "C", "label": "燃系热血" },
+    { "id": "D", "label": "自己说说" }
+  ]
+}
