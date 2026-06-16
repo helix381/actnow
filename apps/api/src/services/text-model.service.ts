@@ -102,6 +102,87 @@ export class TextModelService {
     return this.completeViaOpenAiCompatible(messages, model);
   }
 
+  async *stream(messages: ChatMessage[], model = this.defaultModel): AsyncGenerator<string> {
+    if (!this.enabled || !model || model === "replace-with-model-id") {
+      return;
+    }
+    if (this.proxyMode === "actnow-proxy") {
+      yield* this.streamViaActNowProxy(messages, model);
+    } else {
+      yield* this.streamViaOpenAiCompatible(messages, model);
+    }
+  }
+
+  private async *streamViaOpenAiCompatible(messages: ChatMessage[], model: string): AsyncGenerator<string> {
+    const endpoint = `${this.baseUrl.replace(/\/$/, "")}/chat/completions`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey}` },
+      body: JSON.stringify({ model, messages, temperature: 0.7, stream: true })
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`text model request failed: ${response.status} ${detail}`);
+    }
+    yield* this.parseSseStream(response.body!);
+  }
+
+  private async *streamViaActNowProxy(messages: ChatMessage[], model: string): AsyncGenerator<string> {
+    const provider = ACTNOW_PROXY_PROVIDERS[model] ?? DEFAULT_ACTNOW_PROXY_PROVIDER;
+    const proxyBaseUrl = this.baseUrl.replace(/\/$/, "");
+    const endpoint = `${proxyBaseUrl}${this.proxyPath}`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        Origin: proxyBaseUrl,
+        Referer: `${proxyBaseUrl}/`,
+        "X-API-Key": this.apiKey
+      },
+      body: JSON.stringify({
+        url: provider.url,
+        model_id: provider.modelId,
+        model,
+        thinking_enabled: false,
+        body: { model, messages, temperature: 0.7, stream: true, max_tokens: Number(process.env.TEXT_MODEL_PROXY_MAX_TOKENS || 4096) }
+      })
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`text model proxy request failed: ${response.status} ${detail}`);
+    }
+    yield* this.parseSseStream(response.body!);
+  }
+
+  private async *parseSseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === "[DONE]") return;
+          try {
+            const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+            const token = parsed.choices?.[0]?.delta?.content;
+            if (token) yield token;
+          } catch { /* ignore */ }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
   private async completeViaOpenAiCompatible(messages: ChatMessage[], model: string) {
     const endpoint = `${this.baseUrl.replace(/\/$/, "")}/chat/completions`;
     const response = await fetch(endpoint, {

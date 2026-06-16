@@ -1,18 +1,23 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { AgentEvent, WorkspaceAggregate } from "../lib/api";
+
+type SendMessageMeta = { genesisStep?: string; clientContext?: Record<string, unknown> };
+
+type StreamingCard = { id: string; agentId: string; agentName: string; text: string; isDone: boolean };
 
 type ChatStageProps = {
   events: AgentEvent[];
   error: string | null;
   isApproving: boolean;
+  isGenerating: boolean;
   isLoading: boolean;
   isLocking: boolean;
   onConfirmApproval: (approvalId: string) => void;
   onEnterCanvas: () => void;
-  onContinueWorkflow: (settings: ShortFilmSettings) => void;
   onRejectApproval: (approvalId: string) => void;
   onRetry: () => void;
-  onSendMessage: (content: string) => void;
+  onSendMessage: (content: string, meta?: SendMessageMeta) => void;
+  streamingCards?: StreamingCard[];
   workspace: WorkspaceAggregate | null;
 };
 
@@ -20,43 +25,31 @@ type RenderEventOptions = {
   isApproving: boolean;
   onConfirmApproval: (approvalId: string) => void;
   onRejectApproval: (approvalId: string) => void;
-};
-
-type ShortFilmSettings = {
-  length: "short" | "long";
-  ratio: "16:9" | "9:16";
-  language: "zh" | "en" | "ja";
-};
-
-const defaultSettings: ShortFilmSettings = {
-  length: "short",
-  ratio: "9:16",
-  language: "zh"
+  onSendMessage: (content: string, meta?: SendMessageMeta) => void;
 };
 
 export function ChatStage({
   events,
   error,
   isApproving,
+  isGenerating,
   isLoading,
   isLocking,
   onConfirmApproval,
-  onContinueWorkflow,
   onEnterCanvas,
   onRejectApproval,
   onRetry,
   onSendMessage,
+  streamingCards = [],
   workspace
 }: ChatStageProps) {
   const [draft, setDraft] = useState("");
-  const [settings, setSettings] = useState<ShortFilmSettings>(defaultSettings);
-  const [workflowConfirmed, setWorkflowConfirmed] = useState(false);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const visibleEvents = useMemo(() => toVisibleEvents(events), [events]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [visibleEvents.length, isLoading]);
+  }, [visibleEvents.length, isLoading, isGenerating, streamingCards.length]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -95,23 +88,10 @@ export function ChatStage({
             renderEvent(event, {
               isApproving,
               onConfirmApproval,
-              onRejectApproval
+              onRejectApproval,
+              onSendMessage
             })
           )}
-
-          {hasWorkflowSignal(events) && !workflowConfirmed && (
-            <WorkflowSetupCard
-              disabled={isLoading || isLocking}
-              onContinue={() => {
-                setWorkflowConfirmed(true);
-                onContinueWorkflow(settings);
-              }}
-              onSettingsChange={setSettings}
-              settings={settings}
-            />
-          )}
-
-          {workflowConfirmed && <WorkflowConfirmedCard />}
 
           {!isLoading && visibleEvents.length === 0 && (
             <article className="message system product-agent-message">
@@ -120,6 +100,23 @@ export function ChatStage({
               <p>我会先理解创作方向，再帮你启动工作流和确认短片参数。</p>
             </article>
           )}
+
+          {isGenerating && !isLoading && (
+            <article className="message agent director-planning generating-state">
+              <span className="pulse" />
+              <p>导演正在搭建架构…通常需要 30—60 秒</p>
+            </article>
+          )}
+
+          {streamingCards.map((card) => (
+            <AgentThinkingCard
+              key={card.id}
+              agentId={card.agentId}
+              agentName={card.agentName}
+              isDone={card.isDone}
+              text={card.text}
+            />
+          ))}
 
           <div ref={messageEndRef} />
         </div>
@@ -175,13 +172,81 @@ function renderEvent(event: AgentEvent, options: RenderEventOptions) {
         </article>
       );
 
-    case "multi_agent.final_message_created":
+    case "multi_agent.final_message_created": {
+      const responseType = readText(event.payload, "response_type");
+
+      if (responseType === "option_cards") {
+        return (
+          <OptionCardsMessage
+            key={event.id}
+            directorMessage={readText(event.payload, "text")}
+            payload={(event.payload as Record<string, unknown>)?.option_cards}
+            onSelect={options.onSendMessage}
+          />
+        );
+      }
+
+      if (responseType === "expansion") {
+        return (
+          <ExpansionMessage
+            key={event.id}
+            directorMessage={readText(event.payload, "text")}
+            payload={(event.payload as Record<string, unknown>)?.expansion}
+            onSelect={options.onSendMessage}
+          />
+        );
+      }
+
+      if (responseType === "quick_poll") {
+        return (
+          <QuickPollMessage
+            key={event.id}
+            pollScriptId={readText(event.payload, "poll_script_id")}
+            onSelect={options.onSendMessage}
+          />
+        );
+      }
+
+      if (responseType === "param_collection") {
+        return (
+          <ParamCollectionMessage
+            key={event.id}
+            directorMessage={readText(event.payload, "text")}
+            payload={(event.payload as Record<string, unknown>)?.param_collection}
+            onConfirm={options.onSendMessage}
+          />
+        );
+      }
+
+      if (responseType === "world_card") {
+        return (
+          <WorldCardMessage
+            key={event.id}
+            directorMessage={readText(event.payload, "text")}
+            payload={(event.payload as Record<string, unknown>)?.world_card}
+            onConfirm={options.onSendMessage}
+          />
+        );
+      }
+
+      if (responseType === "outline_card") {
+        return (
+          <OutlineCardMessage
+            key={event.id}
+            directorMessage={readText(event.payload, "text")}
+            payload={(event.payload as Record<string, unknown>)?.outline_card}
+            onConfirm={options.onSendMessage}
+          />
+        );
+      }
+
       return (
         <article className="message agent product-agent-message" key={event.id}>
           <span className="agent-badge">导演</span>
-          <p>{directorMessage(event.payload)}</p>
+          <p>{readText(event.payload, "text") || "规划完成。"}</p>
         </article>
       );
+    }
 
     case "multi_agent.approval_required":
       return <ApprovalCard event={event} key={event.id} options={options} />;
@@ -223,120 +288,121 @@ function renderEvent(event: AgentEvent, options: RenderEventOptions) {
   }
 }
 
-function WorkflowSetupCard({
-  disabled,
-  onContinue,
-  onSettingsChange,
-  settings
+function OptionCardsMessage({
+  directorMessage,
+  onSelect,
+  payload
 }: {
-  disabled: boolean;
-  onContinue: () => void;
-  onSettingsChange: (settings: ShortFilmSettings) => void;
-  settings: ShortFilmSettings;
+  directorMessage: string;
+  onSelect: (content: string, meta?: SendMessageMeta) => void;
+  payload: unknown;
 }) {
+  type Option = { id: string; label: string; hook: string };
+  const options: Option[] = Array.isArray((payload as { options?: unknown })?.options)
+    ? ((payload as { options: Option[] }).options)
+    : [];
+
   return (
-    <article className="message agent workflow-card">
+    <article className="message agent product-agent-message">
       <span className="agent-badge">导演</span>
-      <h2>规划完成</h2>
-      <p>我已经理解你的创作方向。下一步先激活工作流，并确认短片参数。</p>
-
-      <section className="workflow-step">
-        <span className="step-check">✓</span>
-        <strong>激活工作流</strong>
-      </section>
-
-      <section className="workflow-step">
-        <span className="step-check">✓</span>
-        <strong>更新短片参数</strong>
-      </section>
-
-      <FieldGroup label="影片长度">
-        <SegmentButton
-          active={settings.length === "short"}
-          label="短视频"
-          subLabel="<1min"
-          onClick={() => onSettingsChange({ ...settings, length: "short" })}
-        />
-        <SegmentButton
-          active={settings.length === "long"}
-          label="长视频"
-          subLabel=">=1min"
-          onClick={() => onSettingsChange({ ...settings, length: "long" })}
-        />
-      </FieldGroup>
-
-      <FieldGroup label="影片比例">
-        <SegmentButton
-          active={settings.ratio === "16:9"}
-          label="横版 16:9"
-          onClick={() => onSettingsChange({ ...settings, ratio: "16:9" })}
-        />
-        <SegmentButton
-          active={settings.ratio === "9:16"}
-          label="竖版 9:16"
-          onClick={() => onSettingsChange({ ...settings, ratio: "9:16" })}
-        />
-      </FieldGroup>
-
-      <FieldGroup label="对白语言">
-        <SegmentButton
-          active={settings.language === "en"}
-          label="英文"
-          onClick={() => onSettingsChange({ ...settings, language: "en" })}
-        />
-        <SegmentButton
-          active={settings.language === "zh"}
-          label="中文"
-          onClick={() => onSettingsChange({ ...settings, language: "zh" })}
-        />
-        <SegmentButton
-          active={settings.language === "ja"}
-          label="日文"
-          onClick={() => onSettingsChange({ ...settings, language: "ja" })}
-        />
-      </FieldGroup>
-
-      <button className="workflow-primary" disabled={disabled} onClick={onContinue} type="button">
-        确认并继续
-      </button>
+      {directorMessage && <p>{directorMessage}</p>}
+      <div className="option-cards">
+        {options.map((opt) => (
+          <button
+            className="option-card"
+            key={opt.id}
+            onClick={() => onSelect(`${opt.label}：${opt.hook}`, { genesisStep: "params" })}
+            type="button"
+          >
+            <strong>{opt.label}</strong>
+            <span>{opt.hook}</span>
+          </button>
+        ))}
+      </div>
     </article>
   );
 }
 
-function WorkflowConfirmedCard() {
-  return (
-    <article className="workflow-confirmed-card">
-      <span className="step-check">✓</span>
-      <strong>更新短片参数</strong>
-    </article>
-  );
-}
-
-function FieldGroup({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <div className="setting-group">
-      <h3>{label}</h3>
-      <div className="setting-grid">{children}</div>
-    </div>
-  );
-}
-
-function SegmentButton({
-  active,
-  label,
-  onClick,
-  subLabel
+function ExpansionMessage({
+  directorMessage,
+  onSelect,
+  payload
 }: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  subLabel?: string;
+  directorMessage: string;
+  onSelect: (content: string, meta?: SendMessageMeta) => void;
+  payload: unknown;
 }) {
+  type Option = { name: string; hook_3s: string; core_appeal: string; why_binge: string };
+  const options: Option[] = Array.isArray((payload as { options?: unknown })?.options)
+    ? ((payload as { options: Option[] }).options)
+    : [];
+
   return (
-    <button className={active ? "setting-option active" : "setting-option"} onClick={onClick} type="button">
-      <strong>{label}</strong>
-      {subLabel && <span>{subLabel}</span>}
-    </button>
+    <article className="message agent product-agent-message">
+      <span className="agent-badge">导演</span>
+      {directorMessage && <p>{directorMessage}</p>}
+      <div className="expansion-cards">
+        {options.map((opt, i) => (
+          <button
+            className="expansion-card"
+            key={i}
+            onClick={() => onSelect(opt.name, { genesisStep: "params" })}
+            type="button"
+          >
+            <strong>{opt.name}</strong>
+            <p>{opt.hook_3s}</p>
+            <span>{opt.core_appeal}</span>
+          </button>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+const POLL_SCRIPTS: Record<string, { question: string; options: string[] }> = {
+  g1_poll_genre: {
+    question: "你想做哪种类型？",
+    options: ["爱情", "悬疑", "职场", "奇幻", "犯罪"]
+  },
+  g1_poll_emotion: {
+    question: "你希望观众看完什么感受？",
+    options: ["爽", "感动", "恐惧", "共鸣", "震撼"]
+  },
+  g1_poll_setting: {
+    question: "故事发生在什么背景下？",
+    options: ["现代都市", "古代", "未来", "异世界", "末日"]
+  }
+};
+
+function QuickPollMessage({
+  onSelect,
+  pollScriptId
+}: {
+  onSelect: (content: string) => void;
+  pollScriptId: string;
+}) {
+  const script = POLL_SCRIPTS[pollScriptId] ?? {
+    question: "能再说得具体一点吗？",
+    options: ["继续描述我的想法", "换个方向试试"]
+  };
+
+  return (
+    <article className="message agent product-agent-message">
+      <span className="agent-badge">导演</span>
+      <p>{script.question}</p>
+      <div className="quick-poll">
+        {script.options.map((opt) => (
+          <button
+            className="poll-option"
+            key={opt}
+            onClick={() => onSelect(opt)}
+            type="button"
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -372,6 +438,233 @@ function ApprovalCard({ event, options }: { event: AgentEvent; options: RenderEv
   );
 }
 
+function ParamCollectionMessage({
+  directorMessage,
+  onConfirm,
+  payload
+}: {
+  directorMessage: string;
+  onConfirm: (content: string, meta?: SendMessageMeta) => void;
+  payload: unknown;
+}) {
+  type ParamField = { id: string; label: string; type: "select"; options: string[] };
+  type ParamCollection = { selected_direction: string; fields: ParamField[] };
+  const data = payload && typeof payload === "object" ? (payload as ParamCollection) : null;
+  const fields: ParamField[] = Array.isArray(data?.fields) ? data.fields : [];
+
+  const [selections, setSelections] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map((f) => [f.id, f.options[0] ?? ""]))
+  );
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handleConfirm = useCallback(() => {
+    if (confirmed) return;
+    setConfirmed(true);
+    const summary = fields.map((f) => selections[f.id]).filter(Boolean).join(" / ");
+    const content = `参数已定：${summary}`;
+    onConfirm(content, {
+      genesisStep: "create",
+      clientContext: { params: { ...selections }, selected_direction: data?.selected_direction ?? "" }
+    });
+  }, [confirmed, fields, selections, data, onConfirm]);
+
+  return (
+    <article className="message agent product-agent-message">
+      <span className="agent-badge">导演</span>
+      {directorMessage && <p>{directorMessage}</p>}
+      <div className="param-collection">
+        {fields.map((field) => (
+          <div className="param-row" key={field.id}>
+            <span className="param-label">{field.label}</span>
+            <div className="param-options">
+              {field.options.map((opt) => (
+                <button
+                  className={`param-opt${selections[field.id] === opt ? " selected" : ""}`}
+                  disabled={confirmed}
+                  key={opt}
+                  onClick={() => setSelections((prev) => ({ ...prev, [field.id]: opt }))}
+                  type="button"
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="param-confirm-row">
+          <button
+            className="param-confirm-btn"
+            disabled={confirmed}
+            onClick={handleConfirm}
+            type="button"
+          >
+            {confirmed ? "已确认，搭建中…" : "确认，开始构建世界观"}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function WorldCardMessage({
+  directorMessage,
+  onConfirm,
+  payload
+}: {
+  directorMessage: string;
+  onConfirm: (content: string, meta?: SendMessageMeta) => void;
+  payload: unknown;
+}) {
+  type Character = { name: string; role: string; trait: string };
+  type WorldCard = { title: string; logline: string; characters: Character[]; mechanism: string; visual_style: string; red_lines: string[] };
+  const card = payload && typeof payload === "object" ? (payload as WorldCard) : null;
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handleConfirm = useCallback(() => {
+    if (confirmed || !card) return;
+    setConfirmed(true);
+    onConfirm(`世界观确认，开始写${card.title}大纲`, { genesisStep: "outline" });
+  }, [confirmed, card, onConfirm]);
+
+  if (!card) return null;
+
+  return (
+    <article className="message agent product-agent-message world-card-message">
+      <span className="agent-badge">导演</span>
+      {directorMessage && <p>{directorMessage}</p>}
+      <div className="world-card">
+        <h3 className="world-card-title">{card.title}</h3>
+        <p className="world-card-logline">{card.logline}</p>
+        <div className="world-card-section">
+          <span className="world-card-label">核心机制</span>
+          <p>{card.mechanism}</p>
+        </div>
+        <div className="world-card-section">
+          <span className="world-card-label">视觉风格</span>
+          <p>{card.visual_style}</p>
+        </div>
+        {Array.isArray(card.characters) && card.characters.length > 0 && (
+          <div className="world-card-section">
+            <span className="world-card-label">角色</span>
+            <ul className="world-card-chars">
+              {card.characters.map((c, i) => (
+                <li key={i}><strong>{c.name}</strong>（{c.role}）{c.trait}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {Array.isArray(card.red_lines) && card.red_lines.length > 0 && (
+          <div className="world-card-section">
+            <span className="world-card-label">红线</span>
+            <ul className="world-card-redlines">
+              {card.red_lines.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          </div>
+        )}
+        <div className="world-card-actions">
+          <button
+            className="world-card-confirm"
+            disabled={confirmed}
+            onClick={handleConfirm}
+            type="button"
+          >
+            {confirmed ? "已确认，导演拆大纲中…" : "确认，开始拆整季大纲"}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function OutlineCardMessage({
+  directorMessage,
+  onConfirm,
+  payload
+}: {
+  directorMessage: string;
+  onConfirm: (content: string, meta?: SendMessageMeta) => void;
+  payload: unknown;
+}) {
+  type OutlineEp = { ep: number; title: string; synopsis: string };
+  type OutlineCard = { title: string; episode_count: number; season_arc: string; episodes: OutlineEp[] };
+  const card = payload && typeof payload === "object" ? (payload as OutlineCard) : null;
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handleConfirm = useCallback(() => {
+    if (confirmed || !card) return;
+    setConfirmed(true);
+    onConfirm(`大纲确认，开始写${card.title}第一集`);
+  }, [confirmed, card, onConfirm]);
+
+  if (!card) return null;
+
+  return (
+    <article className="message agent product-agent-message outline-card-message">
+      <span className="agent-badge">导演</span>
+      {directorMessage && <p>{directorMessage}</p>}
+      <div className="outline-card">
+        <div className="outline-card-header">
+          <h3 className="outline-card-title">{card.title}</h3>
+          <span className="outline-card-ep-count">{card.episode_count}集</span>
+        </div>
+        {card.season_arc && (
+          <p className="outline-card-arc">{card.season_arc}</p>
+        )}
+        <ol className="outline-card-episodes">
+          {Array.isArray(card.episodes) && card.episodes.map((ep) => (
+            <li key={ep.ep} className="outline-ep-row">
+              <span className="outline-ep-num">EP{ep.ep}</span>
+              <span className="outline-ep-title">{ep.title}</span>
+              <span className="outline-ep-synopsis">{ep.synopsis}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="outline-card-actions">
+          <button
+            className="outline-card-confirm"
+            disabled={confirmed}
+            onClick={handleConfirm}
+            type="button"
+          >
+            {confirmed ? "已确认，等待编剧接手…" : "确认大纲，开始写单集"}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+const AGENT_LABELS: Record<string, string> = {
+  director: "导演",
+  screenwriter: "编剧",
+  storyboard: "分镜师",
+  asset: "资产师",
+  cinematographer: "摄影师"
+};
+
+function AgentThinkingCard({
+  agentId,
+  agentName,
+  isDone,
+  text
+}: {
+  agentId: string;
+  agentName: string;
+  isDone: boolean;
+  text: string;
+}) {
+  const label = AGENT_LABELS[agentId] ?? agentName;
+  return (
+    <article className={`message agent agent-thinking${isDone ? " agent-thinking-done" : ""}`}>
+      <span className="agent-badge">{label}</span>
+      <div className="thinking-text">
+        {text}
+        {!isDone && <span className="thinking-cursor" aria-hidden="true" />}
+      </div>
+    </article>
+  );
+}
+
 function toVisibleEvents(events: AgentEvent[]) {
   const allowed = new Set([
     "message.created",
@@ -386,32 +679,6 @@ function toVisibleEvents(events: AgentEvent[]) {
     "tool.failed"
   ]);
   return events.filter((event) => allowed.has(event.event_type));
-}
-
-function hasWorkflowSignal(events: AgentEvent[]) {
-  return events.some((event) => event.event_type === "multi_agent.route_decided" || event.event_type === "multi_agent.final_message_created");
-}
-
-function directorMessage(payload: unknown) {
-  const raw = readText(payload, "text");
-  if (!raw) {
-    return "规划完成。";
-  }
-
-  if (raw.includes("项目已创建")) {
-    return raw;
-  }
-
-  const normalized = raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((line) => !line.startsWith("导演路由"))
-    .filter((line) => !line.startsWith("【"))
-    .filter((line) => !line.includes("确认卡片"))
-    .join(" ");
-
-  return normalized || "规划完成。";
 }
 
 function readText(payload: unknown, key: string) {

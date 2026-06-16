@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Res } from "@nestjs/common";
+import type { Response } from "express";
 import type { CreateAgentMessageRequest } from "@actnow/shared";
 import { AgentEventsService } from "../services/agent-events.service.js";
 
@@ -12,6 +13,29 @@ export class AgentController {
     @Body() body: CreateAgentMessageRequest
   ) {
     return this.events.createThreadMessage(threadId, body);
+  }
+
+  @Post("threads/:threadId/messages/stream")
+  async streamThreadMessage(
+    @Param("threadId") threadId: string,
+    @Body() body: CreateAgentMessageRequest,
+    @Res() res: Response
+  ) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    try {
+      for await (const event of this.events.streamThreadMessage(threadId, body)) {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    } catch (error) {
+      res.write(`data: ${JSON.stringify({ type: "error", message: error instanceof Error ? error.message : "stream failed" })}\n\n`);
+    } finally {
+      res.end();
+    }
   }
 
   @Get("threads/:threadId/events")

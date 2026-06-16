@@ -15,11 +15,11 @@ export type AgentDefinition = {
 };
 
 const AGENT_FILES: Record<ActNowAgentId, string> = {
-  director: "director.system.md",
-  screenwriter: "screenwriter.system.md",
-  storyboard: "storyboard.system.md",
-  asset: "asset.system.md",
-  cinematographer: "cinematographer.system.md"
+  director: "director/system.md",
+  screenwriter: "screenwriter/system.md",
+  storyboard: "storyboard/system.md",
+  asset: "asset/system.md",
+  cinematographer: "cinematographer/system.md"
 };
 
 @Injectable()

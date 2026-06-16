@@ -87,23 +87,6 @@ export class ProjectsService {
         }
       });
 
-      const message = await tx.agentMessage.create({
-        data: {
-          threadId: thread.id,
-          role: "user",
-          content: initialInput
-        }
-      });
-
-      await tx.agentEvent.create({
-        data: {
-          threadId: thread.id,
-          eventType: "message.created",
-          actor: "human",
-          payloadJson: { message_id: message.id, role: message.role }
-        }
-      });
-
       await tx.scriptDraft.create({
         data: {
           projectId: project.id,

@@ -4,6 +4,13 @@ import { randomUUID } from "node:crypto";
 import { AgentRegistryService, type AgentDefinition } from "./agent-registry.service.js";
 import { TextModelService } from "./text-model.service.js";
 
+export type OrchestratorStreamEvent =
+  | { type: "director.route"; run_id: string; intent: string; selected_agents: string[]; director_message: string; used_model: boolean; parse_error?: string | null }
+  | { type: "agent.start"; run_id: string; agent_id: string; agent_name: string }
+  | { type: "agent.token"; run_id: string; agent_id: string; token: string }
+  | { type: "agent.done"; run_id: string; agent_id: string; content: string; model: string; used_model: boolean }
+  | { type: "run.done"; run_id: string; route: DirectorRoute; agents: AgentOutput[]; approval: object | null; final: DirectorFinalOutput; model_provider: string; model_routing: { director: string; worker: string } };
+
 type WorkerAgentId = Exclude<ActNowAgentId, "director">;
 
 type AgentOutput = {
@@ -34,10 +41,31 @@ type PlannedAction = {
   status: "pending_approval";
 };
 
+type OptionCard = { id: string; label: string; hook: string };
+type ExpansionOption = { name: string; hook_3s: string; core_appeal: string; why_binge: string };
+type ParamField = { id: string; label: string; type: "select"; options: string[] };
+type ParamCollection = { selected_direction: string; fields: ParamField[] };
+type WorldCardCharacter = { name: string; role: string; trait: string };
+type WorldCard = { title: string; logline: string; characters: WorldCardCharacter[]; mechanism: string; visual_style: string; red_lines: string[] };
+type OutlineEpisode = { ep: number; title: string; synopsis: string };
+type OutlineCard = { title: string; episode_count: number; season_arc: string; episodes: OutlineEpisode[] };
+
+type DirectorFinalOutput = {
+  text: string;
+  response_type: "option_cards" | "expansion" | "quick_poll" | "param_collection" | "world_card" | "outline_card" | null;
+  option_cards: { options: OptionCard[] } | null;
+  expansion: { core_signal?: string; options: ExpansionOption[] } | null;
+  poll_script_id: string | null;
+  param_collection: ParamCollection | null;
+  world_card: WorldCard | null;
+  outline_card: OutlineCard | null;
+};
+
 type DirectorRoute = {
   intent:
-    | "creative_brainstorm"
-    | "script_structuring"
+    | "idea_expansion"
+    | "script_draft"
+    | "script_revision"
     | "storyboard_breakdown"
     | "shot_revision"
     | "asset_extraction"
@@ -48,6 +76,13 @@ type DirectorRoute = {
   needs_approval: boolean;
   planned_actions: PlannedAction[];
   director_message: string;
+  response_type?: "option_cards" | "expansion" | "quick_poll" | "param_collection" | "world_card" | "outline_card" | null;
+  option_cards?: { options: OptionCard[] } | null;
+  expansion?: { core_signal?: string; options: ExpansionOption[] } | null;
+  poll_script_id?: string | null;
+  param_collection?: ParamCollection | null;
+  world_card?: WorldCard | null;
+  outline_card?: OutlineCard | null;
   used_model: boolean;
   raw_output?: string | null;
   parse_error?: string | null;
@@ -62,8 +97,9 @@ type RunInput = {
 };
 
 const INTENT_LABELS: Record<DirectorRoute["intent"], string> = {
-  creative_brainstorm: "创意发散",
-  script_structuring: "剧本整理",
+  idea_expansion: "灵感发散",
+  script_draft: "剧本起草",
+  script_revision: "剧本修改",
   storyboard_breakdown: "分镜拆解",
   shot_revision: "镜头修改",
   asset_extraction: "资产抽取",
@@ -87,6 +123,77 @@ export class MultiAgentOrchestratorService {
     private readonly agentRegistry: AgentRegistryService
   ) {}
 
+  async *runStream(input: RunInput): AsyncGenerator<OrchestratorStreamEvent> {
+    const runId = `run_${Date.now()}_${randomUUID().slice(0, 8)}`;
+
+    const route = await this.decideRoute(input);
+    yield {
+      type: "director.route",
+      run_id: runId,
+      intent: route.intent,
+      selected_agents: route.selected_agents,
+      director_message: route.director_message,
+      used_model: route.used_model,
+      parse_error: route.parse_error ?? null
+    };
+
+    const outputs: AgentOutput[] = [];
+
+    for (const agentId of route.selected_agents) {
+      const agent = this.agentRegistry.get(agentId);
+      const model = this.resolveAgentModel(agent);
+      yield { type: "agent.start", run_id: runId, agent_id: agentId, agent_name: AGENT_LABELS[agentId] };
+
+      let content = "";
+      let usedModel = false;
+      try {
+        const messages = [
+          { role: "system" as const, content: agent.systemPrompt },
+          {
+            role: "user" as const,
+            content: [
+              "你是被导演 Agent 临时调用的独立专家。你没有上一轮隐式上下文，必须只基于下面信息完成本轮任务。",
+              this.contextBlock(input),
+              `导演路由：${JSON.stringify({ intent: route.intent, selected_agents: route.selected_agents, needs_approval: route.needs_approval, planned_actions: route.planned_actions })}`,
+              "请给出你这一位专家的结论。保持简洁、具体、可执行。"
+            ].join("\n\n")
+          }
+        ];
+        for await (const token of this.textModel.stream(messages, model)) {
+          content += token;
+          usedModel = true;
+          yield { type: "agent.token", run_id: runId, agent_id: agentId, token };
+        }
+      } catch {
+        content = this.fallback(agentId, input.userMessage, route);
+      }
+
+      if (!content) {
+        content = this.fallback(agentId, input.userMessage, route);
+      }
+
+      outputs.push({ agent_id: agentId, agent_name: AGENT_LABELS[agentId], content, model, used_model: usedModel });
+      yield { type: "agent.done", run_id: runId, agent_id: agentId, content, model, used_model: usedModel };
+    }
+
+    const final = this.composeFinal(route, outputs);
+    const approval =
+      route.needs_approval && route.planned_actions.length > 0
+        ? this.createApprovalPayload(runId, route)
+        : null;
+
+    yield {
+      type: "run.done",
+      run_id: runId,
+      route,
+      agents: outputs,
+      approval,
+      final,
+      model_provider: this.textModel.enabled ? this.textModel.providerName : "local-fallback",
+      model_routing: { director: this.resolveDirectorModel(), worker: this.resolveWorkerModel() }
+    };
+  }
+
   async run(input: RunInput) {
     const runId = `run_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const route = await this.decideRoute(input);
@@ -102,7 +209,7 @@ export class MultiAgentOrchestratorService {
         route.needs_approval && route.planned_actions.length > 0
           ? this.createApprovalPayload(runId, route)
           : null,
-      final_text: this.composeFinal(route, outputs),
+      final: this.composeFinal(route, outputs),
       model_provider: this.textModel.enabled ? this.textModel.providerName : "local-fallback",
       model_routing: {
         director: this.resolveDirectorModel(),
@@ -224,7 +331,7 @@ export class MultiAgentOrchestratorService {
       return {
         intent,
         selected_agents:
-          selectedAgents.length > 0 || intent === "clarification"
+          selectedAgents.length > 0 || intent === "clarification" || intent === "idea_expansion"
             ? selectedAgents
             : fallback.selected_agents,
         needs_approval:
@@ -236,6 +343,37 @@ export class MultiAgentOrchestratorService {
           typeof parsed.director_message === "string" && parsed.director_message.trim()
             ? parsed.director_message.trim()
             : fallback.director_message,
+        response_type:
+          parsed.response_type === "option_cards" ||
+          parsed.response_type === "expansion" ||
+          parsed.response_type === "quick_poll" ||
+          parsed.response_type === "param_collection" ||
+          parsed.response_type === "world_card" ||
+          parsed.response_type === "outline_card"
+            ? parsed.response_type
+            : null,
+        option_cards:
+          parsed.option_cards && typeof parsed.option_cards === "object"
+            ? (parsed.option_cards as { options: OptionCard[] })
+            : null,
+        expansion:
+          parsed.expansion && typeof parsed.expansion === "object"
+            ? (parsed.expansion as { core_signal?: string; options: ExpansionOption[] })
+            : null,
+        poll_script_id:
+          typeof parsed.poll_script_id === "string" ? parsed.poll_script_id : null,
+        param_collection:
+          parsed.param_collection && typeof parsed.param_collection === "object"
+            ? (parsed.param_collection as ParamCollection)
+            : null,
+        world_card:
+          parsed.world_card && typeof parsed.world_card === "object"
+            ? (parsed.world_card as WorldCard)
+            : null,
+        outline_card:
+          parsed.outline_card && typeof parsed.outline_card === "object"
+            ? (parsed.outline_card as OutlineCard)
+            : null,
         used_model: true,
         raw_output: content,
         parse_error: null
@@ -338,7 +476,7 @@ export class MultiAgentOrchestratorService {
   private fallbackRoute(input: RunInput, modelError: string | null): DirectorRoute {
     const message = input.userMessage.trim();
     const selected = new Set<WorkerAgentId>();
-    let intent: DirectorRoute["intent"] = "creative_brainstorm";
+    let intent: DirectorRoute["intent"] = "idea_expansion";
     let needsApproval = false;
     const plannedActions: PlannedAction[] = [];
 
@@ -350,13 +488,13 @@ export class MultiAgentOrchestratorService {
     }
 
     if (/(剧本|三幕|台词|人物动机|冲突|故事|剧情)/.test(message)) {
-      intent = intent === "creative_brainstorm" ? "script_structuring" : intent;
+      intent = intent === "idea_expansion" ? "script_revision" : intent;
       selected.add("screenwriter");
       needsApproval = needsApproval || /(写入|生成正式|锁定|修改|更新)/.test(message);
     }
 
     if (/(资产|角色|场景|道具|参考|素材)/.test(message)) {
-      intent = intent === "creative_brainstorm" ? "asset_extraction" : intent;
+      intent = intent === "idea_expansion" ? "asset_extraction" : intent;
       selected.add("asset");
       needsApproval = needsApproval || /(写入|创建|新增|抽取|生成清单)/.test(message);
     }
@@ -454,34 +592,35 @@ export class MultiAgentOrchestratorService {
     };
   }
 
-  private composeFinal(route: DirectorRoute, outputs: AgentOutput[]) {
-    if (route.intent === "clarification") {
-      return route.director_message;
-    }
+  private composeFinal(route: DirectorRoute, outputs: AgentOutput[]): DirectorFinalOutput {
+    return {
+      text: this.composeFinalText(route, outputs),
+      response_type: route.response_type ?? null,
+      option_cards: route.option_cards ?? null,
+      expansion: route.expansion ?? null,
+      poll_script_id: route.poll_script_id ?? null,
+      param_collection: route.param_collection ?? null,
+      world_card: route.world_card ?? null,
+      outline_card: route.outline_card ?? null
+    };
+  }
 
-    const expertSummary = outputs.length > 0
-      ? "我已经让相关创作专家完成初步判断。"
-      : "我已经完成初步判断。";
-    const approvalLine = route.needs_approval
-      ? "接下来先确认工作流和短片参数；确认前不会写入项目。"
-      : "这一步只做创作规划，不会写入项目。";
-
-    return [
-      "规划完成。",
-      route.director_message,
-      expertSummary,
-      approvalLine
-    ].join("\n");
+  private composeFinalText(route: DirectorRoute, _outputs: AgentOutput[]) {
+    return route.director_message || "规划完成。";
   }
 
   private contextBlock(input: RunInput) {
-    return [
+    const genesisStep = (input.clientContext?.genesis_step as string) || "expand";
+    const params = input.clientContext?.params as Record<string, string> | undefined;
+    const lines = [
       `用户本轮输入：${input.userMessage}`,
+      `项目状态：${JSON.stringify({ has_canonical_ir: false, genesis_step: genesisStep })}`,
+      params ? `用户已选参数：${JSON.stringify(params)}` : null,
       `线程摘要：${input.threadSummary || "暂无"}`,
       `焦点对象：${input.focusRef ? `${input.focusRef.type}:${input.focusRef.id}` : "暂无"}`,
-      `客户端上下文：${JSON.stringify(input.clientContext ?? {})}`,
       `最近历史：${input.history.map((item) => `${item.role}: ${item.content}`).join("\n") || "暂无"}`
-    ].join("\n\n");
+    ];
+    return lines.filter(Boolean).join("\n\n");
   }
 
   private workerAgentIds() {

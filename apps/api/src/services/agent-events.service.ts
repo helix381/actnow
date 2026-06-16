@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreateAgentMessageRequest } from "@actnow/shared";
 import { Prisma } from "@prisma/client";
-import { MultiAgentOrchestratorService } from "./multi-agent-orchestrator.service.js";
+import { MultiAgentOrchestratorService, OrchestratorStreamEvent } from "./multi-agent-orchestrator.service.js";
 import { PrismaService } from "./prisma.service.js";
 import { presentWorkspace } from "./workspace-presenter.js";
 
@@ -177,7 +177,7 @@ export class AgentEventsService {
         data: {
           threadId,
           role: "assistant",
-          content: run.final_text,
+          content: run.final.text,
           modelMetaJson: {
             run_id: run.run_id,
             model_provider: run.model_provider,
@@ -201,9 +201,15 @@ export class AgentEventsService {
           actor: "agent",
           payloadJson: {
             message_id: assistant.id,
-            text: run.final_text,
-            run_id: run.run_id
-          }
+            run_id: run.run_id,
+            text: run.final.text,
+            response_type: run.final.response_type,
+            option_cards: run.final.option_cards,
+            expansion: run.final.expansion,
+            poll_script_id: run.final.poll_script_id,
+            param_collection: run.final.param_collection,
+            world_card: run.final.world_card
+          } as Prisma.InputJsonValue
         }
       });
 
@@ -216,6 +222,166 @@ export class AgentEventsService {
       assistant_message_id: result.assistant.id,
       run_id: run.run_id
     };
+  }
+
+  async *streamThreadMessage(
+    threadId: string,
+    body: CreateAgentMessageRequest
+  ): AsyncGenerator<OrchestratorStreamEvent | { type: "error"; message: string }> {
+    const content = body.content?.trim();
+    if (!content) {
+      yield { type: "error", message: "content is required" };
+      return;
+    }
+    const displayText = body.display_text?.trim() || content;
+
+    const thread = await this.prisma.agentThread.findUnique({ where: { id: threadId } });
+    if (!thread) {
+      yield { type: "error", message: "agent thread not found" };
+      return;
+    }
+
+    const previousMessages = await this.prisma.agentMessage.findMany({
+      where: { threadId },
+      orderBy: { createdAt: "desc" },
+      take: 8
+    });
+
+    type RunDoneEvent = Extract<OrchestratorStreamEvent, { type: "run.done" }>;
+    let runDoneEvent: RunDoneEvent | null = null;
+
+    try {
+      for await (const event of this.orchestrator.runStream({
+        userMessage: content,
+        threadSummary: thread.summary,
+        focusRef: body.focus_ref ?? null,
+        clientContext: body.client_context ?? {},
+        history: previousMessages.reverse().map((m) => ({ role: m.role, content: m.content }))
+      })) {
+        yield event;
+        if (event.type === "run.done") {
+          runDoneEvent = event as RunDoneEvent;
+        }
+      }
+    } catch (error) {
+      yield { type: "error", message: error instanceof Error ? error.message : "orchestrator failed" };
+      return;
+    }
+
+    // Save to DB after stream completes
+    if (runDoneEvent) {
+      const run = runDoneEvent;
+      await this.prisma.$transaction(async (tx) => {
+        const created = await tx.agentMessage.create({
+          data: {
+            threadId,
+            role: "user",
+            content,
+            modelMetaJson: { client_context: body.client_context ?? {}, display_text: displayText, focus_ref: body.focus_ref ?? null } as Prisma.InputJsonValue
+          }
+        });
+
+        await tx.agentEvent.create({
+          data: {
+            threadId,
+            eventType: "message.created",
+            actor: "human",
+            payloadJson: { message_id: created.id, text: content, display_text: displayText, focus_ref: body.focus_ref ?? null }
+          }
+        });
+
+        await tx.agentEvent.create({
+          data: {
+            threadId,
+            taskId: run.run_id,
+            eventType: "multi_agent.run_started",
+            actor: "agent",
+            payloadJson: { run_id: run.run_id, model_provider: run.model_provider, model_routing: run.model_routing }
+          }
+        });
+
+        await tx.agentEvent.create({
+          data: {
+            threadId,
+            taskId: run.run_id,
+            eventType: "multi_agent.route_decided",
+            actor: "agent",
+            payloadJson: {
+              run_id: run.run_id,
+              intent: run.route.intent,
+              selected_agents: run.route.selected_agents,
+              needs_approval: run.route.needs_approval,
+              planned_actions: run.route.planned_actions,
+              director_message: run.route.director_message,
+              used_model: run.route.used_model,
+              parse_error: run.route.parse_error,
+              model: run.model_routing.director
+            } as Prisma.InputJsonValue
+          }
+        });
+
+        for (const output of run.agents) {
+          await tx.agentEvent.create({
+            data: {
+              threadId,
+              taskId: run.run_id,
+              eventType: "multi_agent.agent_completed",
+              actor: "agent",
+              payloadJson: { run_id: run.run_id, ...output } as Prisma.InputJsonValue
+            }
+          });
+        }
+
+        if (run.approval) {
+          await tx.agentEvent.create({
+            data: {
+              threadId,
+              taskId: run.run_id,
+              eventType: "multi_agent.approval_required",
+              actor: "agent",
+              payloadJson: run.approval as Prisma.InputJsonValue
+            }
+          });
+        }
+
+        const assistant = await tx.agentMessage.create({
+          data: {
+            threadId,
+            role: "assistant",
+            content: run.final.text,
+            modelMetaJson: {
+              run_id: run.run_id,
+              model_provider: run.model_provider,
+              model_routing: run.model_routing,
+              route: { intent: run.route.intent, selected_agents: run.route.selected_agents, needs_approval: run.route.needs_approval },
+              agents: run.agents.map((a) => a.agent_id),
+              approval_id: (run.approval as { approval_id?: string } | null)?.approval_id ?? null
+            } as Prisma.InputJsonValue
+          }
+        });
+
+        await tx.agentEvent.create({
+          data: {
+            threadId,
+            taskId: run.run_id,
+            eventType: "multi_agent.final_message_created",
+            actor: "agent",
+            payloadJson: {
+              message_id: assistant.id,
+              run_id: run.run_id,
+              text: run.final.text,
+              response_type: run.final.response_type,
+              option_cards: run.final.option_cards,
+              expansion: run.final.expansion,
+              poll_script_id: run.final.poll_script_id,
+              param_collection: run.final.param_collection,
+              world_card: run.final.world_card,
+              outline_card: run.final.outline_card
+            } as Prisma.InputJsonValue
+          }
+        });
+      });
+    }
   }
 
   async listThreadEvents(threadId: string) {

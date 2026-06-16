@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CanvasStage } from "./components/CanvasStage";
 import { ChatStage } from "./components/ChatStage";
 import { HomeStage } from "./components/HomeStage";
 import {
   AgentEvent,
+  AgentStreamChunk,
   ProjectSummary,
   WorkspaceAggregate,
   confirmAgentApproval,
@@ -13,11 +14,16 @@ import {
   listProjects,
   listAgentEvents,
   lockScript,
-  rejectAgentApproval
+  rejectAgentApproval,
+  streamAgentMessage
 } from "./lib/api";
 
 type Stage = "home" | "chat" | "canvas";
 type RequestState = "idle" | "loading" | "error";
+type StreamingCard = { id: string; agentId: string; agentName: string; text: string; isDone: boolean };
+
+// suppress unused import warning — AgentStreamChunk is used as type annotation below
+type _AgentStreamChunkRef = AgentStreamChunk;
 
 export function App() {
   const [stage, setStage] = useState<Stage>("home");
@@ -30,6 +36,9 @@ export function App() {
   const [lockState, setLockState] = useState<RequestState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [lastInput, setLastInput] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [streamingCards, setStreamingCards] = useState<StreamingCard[]>([]);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   const projectId = workspace?.project.id;
   const threadId = workspace?.agent_thread.id;
@@ -85,7 +94,24 @@ export function App() {
       setStage("chat");
       setCreateState("idle");
       void refreshProjects();
-      await loadEvents(nextWorkspace.agent_thread.id);
+      // Kick off the first director run with the initial input
+      const nextThreadId = nextWorkspace.agent_thread.id;
+      const runId = `ui-run-${Date.now()}`;
+      setEvents([
+        createLocalEvent(nextThreadId, "message.created", "human", { text: initialInput, display_text: initialInput, local: true }, runId),
+        createLocalEvent(nextThreadId, "ui.director_planning", "agent", { text: "导演正在规划..." }, runId)
+      ]);
+      setChatState("loading");
+      try {
+        const result = await createAgentMessage(nextThreadId, {
+          content: initialInput,
+          display_text: initialInput
+        });
+        await loadEvents(result.thread_id);
+      } catch (chatError) {
+        setChatState("error");
+        setError(errorMessage(chatError));
+      }
     } catch (nextError) {
       setCreateState("error");
       setError(errorMessage(nextError));
@@ -106,59 +132,78 @@ export function App() {
     }
   };
 
-  const handleSendMessage = async (content: string, options?: { displayText?: string }) => {
+  const handleSendMessage = async (content: string, options?: { displayText?: string; genesisStep?: string; clientContext?: Record<string, unknown> }) => {
     if (!threadId) {
       return;
     }
 
+    // Cancel any in-progress stream
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+
     const runId = `ui-run-${Date.now()}`;
     const displayText = options?.displayText ?? content;
-    const optimisticEvents = [
-      createLocalEvent(threadId, "message.created", "human", { text: content, display_text: displayText, local: true }, runId),
-      createLocalEvent(threadId, "ui.director_joined", "agent", { text: "导演进入聊天室" }, runId),
-      createLocalEvent(threadId, "ui.director_planning", "agent", { text: "导演正在规划..." }, runId)
-    ];
 
+    setIsGenerating(false);
+    setStreamingCards([]);
     setChatState("loading");
     setError(null);
-    setEvents((currentEvents) => [...currentEvents, ...optimisticEvents]);
+    setEvents((prev) => [
+      ...prev,
+      createLocalEvent(threadId, "message.created", "human", { text: content, display_text: displayText, local: true }, runId)
+    ]);
+
     try {
-      const result = await createAgentMessage(threadId, {
-        content,
-        display_text: displayText,
-        focus_ref: workspace?.agent_thread.focus_ref,
-        client_context: {
-          stage,
-          project_id: projectId
+      for await (const chunk of streamAgentMessage(
+        threadId,
+        {
+          content,
+          display_text: displayText,
+          focus_ref: workspace?.agent_thread.focus_ref,
+          client_context: {
+            stage,
+            project_id: projectId,
+            ...(options?.genesisStep ? { genesis_step: options.genesisStep } : {}),
+            ...(options?.clientContext ? options.clientContext : {})
+          }
+        },
+        controller.signal
+      )) {
+        if (controller.signal.aborted) break;
+        switch (chunk.type) {
+          case "director.route":
+            setStreamingCards([{ id: "director", agentId: "director", agentName: "导演", text: chunk.director_message || "", isDone: true }]);
+            break;
+          case "agent.start":
+            setStreamingCards((prev) => [...prev, { id: chunk.agent_id, agentId: chunk.agent_id, agentName: chunk.agent_name, text: "", isDone: false }]);
+            break;
+          case "agent.token":
+            setStreamingCards((prev) => prev.map((c) => c.id === chunk.agent_id ? { ...c, text: c.text + chunk.token } : c));
+            break;
+          case "agent.done":
+            setStreamingCards((prev) => prev.map((c) => c.id === chunk.agent_id ? { ...c, isDone: true } : c));
+            break;
+          case "run.done":
+            setStreamingCards([]);
+            await loadEvents(threadId);
+            setChatState("idle");
+            break;
+          case "error":
+            throw new Error(chunk.message);
         }
-      });
-      await loadEvents(result.thread_id);
+      }
     } catch (nextError) {
-      setChatState("error");
-      setError(errorMessage(nextError));
-      setEvents((currentEvents) => [
-        ...currentEvents.filter((event) => event.task_id !== runId || event.event_type === "message.created"),
-        createLocalEvent(threadId, "ui.director_failed", "agent", { text: errorMessage(nextError) }, runId)
-      ]);
+      if (!controller.signal.aborted) {
+        setChatState("error");
+        setError(errorMessage(nextError));
+        setStreamingCards([]);
+        setEvents((prev) => [
+          ...prev.filter((e) => e.task_id !== runId || e.event_type === "message.created"),
+          createLocalEvent(threadId, "ui.director_failed", "agent", { text: errorMessage(nextError) }, runId)
+        ]);
+      }
     }
-  };
-
-  const handleContinueWorkflow = (settings: {
-    length: "short" | "long";
-    ratio: "16:9" | "9:16";
-    language: "zh" | "en" | "ja";
-  }) => {
-    const lengthLabel = settings.length === "short" ? "短视频，1 分钟以内" : "长视频，1 分钟以上";
-    const languageLabel = settings.language === "zh" ? "中文" : settings.language === "en" ? "英文" : "日文";
-    const content = [
-      "已确认短剧工作流参数：",
-      `影片长度：${lengthLabel}`,
-      `影片比例：${settings.ratio}`,
-      `对白语言：${languageLabel}`,
-      "请继续在聊天室里完成下一步：先组织编剧和分镜专家拆解剧本结构、Scene 和 Shot 候选。确认前不要写入项目。"
-    ].join("\n");
-
-    void handleSendMessage(content, { displayText: "信息已确认" });
   };
 
   const handleLockScript = async () => {
@@ -266,14 +311,15 @@ export function App() {
             events={events}
             error={chatState === "error" || lockState === "error" || approvalState === "error" ? error : null}
             isApproving={approvalState === "loading"}
+            isGenerating={isGenerating}
             isLoading={chatState === "loading"}
             isLocking={lockState === "loading"}
             onConfirmApproval={handleConfirmApproval}
-            onContinueWorkflow={handleContinueWorkflow}
             onEnterCanvas={handleLockScript}
             onRejectApproval={handleRejectApproval}
             onRetry={handleRetryChat}
             onSendMessage={handleSendMessage}
+            streamingCards={streamingCards}
             workspace={workspace}
           />
         )}

@@ -1,7 +1,8 @@
 # ActNow Multi-Agent 系统 PRD
 
-> 版本 v0.2 · 2026-06-14  
-> 范围：`agents/` 目录下全部 Agent 的目的、流程、Harness 价值与版本规划
+> 版本 v0.3 · 2026-06-15  
+> 范围：`agents/` 目录下全部 Agent 的目的、流程、Harness 价值与版本规划  
+> 变更摘要（v0.2→v0.3）：修复 G1→G1.5→G2 分阶段流程 Bug；实现 `param_collection` / `world_card` 前端组件；新增流式思维链架构（SSE）；同步 genesis_step 实际值与 PRD 原始定义的偏差说明
 
 ---
 
@@ -174,16 +175,55 @@ Agent 本身无状态（`maxTurns=1`），Harness 负责：
 
 ### 4.5 `genesis_step` 状态机
 
-导演创世模式的两个子状态由 Harness 管理，Agent 不需要自己判断流程推进：
+导演创世模式分阶段，由 Harness 管理状态，前端通过 `client_context.genesis_step` 字段驱动跳转。
+
+#### 已实现的实际状态值（v0.3 当前实现）
 
 ```
-project_state.has_canonical_ir = false
+has_canonical_ir = false
       │
-      ├── genesis_step = "expand"  → 调用 Director → 输出 3 个方向
-      │         ↓ 用户选方向（Harness 记录选择）
-      └── genesis_step = "create"  → 调用 Director → 输出 Canonical IR
-                ↓ 用户确认大纲
-         has_canonical_ir = true → 后续全部走路由模式
+      ├─ genesis_step = "expand"（默认）
+      │   Director → G1 发散：response_type = expansion / option_cards / quick_poll
+      │   用户点击方向卡 → 前端发送 genesis_step="params"
+      │   ✅ 已实现
+      │
+      ├─ genesis_step = "params"
+      │   Director → G1.5 参数收集：response_type = "param_collection"
+      │   前端渲染 ParamCollectionMessage（集数 / 画风 / 节奏 / 受众四行选择器 + 确认按钮）
+      │   用户确认 → 前端发送 genesis_step="create" + clientContext.params = {episodes, visual_style, pace, audience}
+      │   ✅ 已实现（Director system.md G1.5 章节 + ParamCollectionMessage 组件）
+      │
+      ├─ genesis_step = "create"
+      │   Director → G2 世界观同步输出：response_type = "world_card"
+      │   前端渲染 WorldCardMessage（title / logline / characters / mechanism / visual_style / red_lines）
+      │   用户点击「确认，开始写大纲」→ 发送普通消息，Director 路由到编剧
+      │   ✅ 已实现（同步，非后台进程）
+      │
+      └─ genesis_step = "outline"（规划中，未实现）
+          Director → G3 正式大纲：六步创世 → Canonical IR + 分集骨架
+          Approval Gate：用户确认大纲 → 写入 DB
+          has_canonical_ir = true → 后续走路由模式
+          ⏳ 未实现
+```
+
+#### PRD 原始设计 vs v0.3 实际实现的差异说明
+
+| PRD 原始 `genesis_step` 值 | PRD 含义 | v0.3 实际值 | v0.3 实际含义 |
+|--------------------------|---------|------------|-------------|
+| `"expand"` | G1 发散 | `"expand"` | G1 发散（一致）|
+| `"params"` | G1.5 参数收集 | `"params"` | G1.5 参数收集（一致）|
+| `"worldcard"` | G2 世界观草稿 | `"create"` | G2 世界观草稿（名称不同，行为已对齐）|
+| `"create"` | G3 六步创世 + Canonical IR | 未实现 | 待补 `"outline"` 阶段 |
+
+**差异原因**：PRD 设计时把 `"create"` 保留给六步创世，但实现时直接用 `"create"` 驱动 G2 world_card 输出。待 G3 实现时，confirm world_card 应发 `genesis_step="outline"` 而非再复用 `"create"`。
+
+#### Harness contextBlock 注入（已实现）
+
+```typescript
+// multi-agent-orchestrator.service.ts contextBlock()
+const genesisStep = clientContext.genesis_step || "expand";
+const params = clientContext.params; // { episodes, visual_style, pace, audience }
+// 当 genesis_step="create" 时，Director 读取 params 来确定世界观参数约束
 ```
 
 ### 4.6 Tool 权限隔离
@@ -208,13 +248,15 @@ project_state.has_canonical_ir = false
 | background | false |
 | Tools | []（Phase 2 可选 search_trends）|
 
-**两种模式 · 三个状态**：
+**四个创世阶段 + 路由模式**（v0.3 已实现状态见 §4.5）：
 
-| 状态 | 触发条件 | 产物 |
-|------|----------|------|
-| G1 发散 | `has_canonical_ir=false, genesis_step="expand"` | 3 个差异化方向（expansion JSON）|
-| G2 创世 | `has_canonical_ir=false, genesis_step="create"` | 正面层 + 天眼层 Canonical IR |
-| 路由 | `has_canonical_ir=true` | planned_actions + selected_agents |
+| 阶段 | genesis_step | 触发条件 | 产物 | 状态 |
+|------|-------------|----------|------|------|
+| G1 发散 | `"expand"` | `has_canonical_ir=false` | expansion / option_cards / quick_poll | ✅ 已实现 |
+| G1.5 参数收集 | `"params"` | 用户点击方向卡 | `param_collection`（集数/画风/节奏/受众）| ✅ 已实现 |
+| G2 世界观草稿 | `"create"` | 用户确认参数 | `world_card`（title/logline/角色/机制/红线）| ✅ 已实现（同步） |
+| G3 正式大纲 | `"outline"`（规划）| 用户确认世界观 | 六步创世 → Canonical IR + 分集骨架 | ⏳ 未实现 |
+| 路由模式 | N/A | `has_canonical_ir=true` | planned_actions + selected_agents | ✅ 框架已有 |
 
 **G1 发散质量约束**：
 - 3 个方向围绕不同爽点类型（禁同类型微调）
@@ -470,54 +512,193 @@ C 级 → 模式 B（先问再展）→ 获得补充后 → 模式 C
 
 ```mermaid
 sequenceDiagram
-    actor U as 用户
-    participant H as Harness
-    participant D as Director
-    participant DB as Database
-    participant SW as Screenwriter
-    participant SB as Storyboard
-    participant AS as Asset
-    participant CM as Cinematographer
+    actor 用户
+    participant 前端
+    participant 调度层
+    participant 导演
+    participant 数据库
+    participant 编剧
+    participant 分镜
+    participant 资产
+    participant 摄影
 
-    U->>H: 发送灵感
-    H->>D: 注入 genesis_step=expand + trendingTopics
-    D-->>H: G1 发散（3个方向）
-    H-->>U: 展示方向卡
-
-    U->>H: 选定方向
-    H->>D: 注入 genesis_step=create + user_confirmed_direction
-    D-->>H: G2 创世（Canonical IR + 分集大纲）
-    H-->>U: 🔒 Approval Gate: 审阅分集大纲
-    U->>H: 确认
-    H->>DB: 写入 canonicalIrJson + showBibleLite
-
-    U->>H: "开始写第1集"
-    H->>SW: 注入 spine[1] + chars[] + locs[] + nodes
-    SW-->>H: 剧本草稿
-    H-->>U: 🔒 Approval Gate: 确认剧本
-    U->>H: 确认
-    H->>DB: 写入 EpisodeScript
-
-    par background=true
-        H->>SB: 注入剧本草稿 + chars[] + locs[]
-        SB-->>H: Scene/Shot 候选
-    and background=true
-        H->>AS: 注入剧本草稿 + 现有 Asset 库
-        AS-->>H: 资产清单
+    rect rgb(20, 30, 50)
+        Note over 用户,数据库: G1 — 灵感发散
+        用户->>前端: 输入创意灵感，点击「开始创作」
+        前端->>调度层: 创建项目 + 发送初始消息（阶段标记=发散）
+        调度层->>导演: 注入阶段=发散 + 本周热点话题包
+        导演-->>调度层: 返回展开卡 / 选项卡 / 快速问卷
+        调度层-->>前端: 写入消息事件
+        前端->>用户: 渲染方向卡片
     end
 
-    H-->>U: 🔒 Approval Gate: 确认分镜树 + 资产
-    U->>H: 确认
-    H->>DB: 写入 Scene / Shot / Asset
+    rect rgb(20, 40, 30)
+        Note over 用户,数据库: G1.5 — 基础参数收集
+        用户->>前端: 点击方向卡片（选定创作方向）
+        前端->>调度层: 发送消息（阶段标记=收集参数，附选定方向文本）
+        调度层->>导演: 注入阶段=收集参数，用户选定方向已注入
+        导演-->>调度层: 返回参数表单（集数 / 画风 / 节奏 / 受众）
+        调度层-->>前端: 写入消息事件
+        前端->>用户: 渲染参数表单卡，等待填写
+    end
 
-    opt 用户需要生成 Prompt
-        H->>CM: 注入 Shot + meta.style + chars[]
-        CM-->>H: generationPrompt
-        H-->>U: 🔒 Approval Gate: 确认生成任务
-        U->>H: 确认
-        H->>DB: 创建 GenerationTask → 推入画布
+    rect rgb(40, 20, 30)
+        Note over 用户,数据库: G2 — 世界观草稿确认
+        用户->>前端: 填写参数 → 点击「确认参数」
+        前端->>调度层: 发送消息（阶段标记=生成世界观，附参数数据）
+        调度层->>导演: 注入阶段=生成世界观，参数数据已注入
+        导演-->>调度层: 返回世界观草稿卡（一句话简介 / 主要角色 / 核心机制 / 画风 / 红线）
+        调度层-->>前端: 写入消息事件
+        前端->>用户: 渲染世界观信息卡（可单项点击修改）
+    end
+
+    rect rgb(40, 35, 15)
+        Note over 用户,数据库: G3 — 正式大纲生成
+        用户->>前端: 确认世界观卡（或修改后再确认）
+        前端->>调度层: 发送消息（阶段标记=正式创作，附完整世界观数据）
+        调度层->>导演: 注入阶段=正式创作，世界观数据注入
+        导演-->>调度层: 六步创世流水线输出逐集大纲
+        调度层-->>用户: 🔒 确认门：审阅分集大纲
+        用户->>调度层: 确认写入
+        调度层->>数据库: 写入正典世界观 + 剧本草稿
+    end
+
+    rect rgb(20, 30, 50)
+        Note over 用户,数据库: 后续循环 — 专家路由（已有世界观）
+        用户->>调度层: 「开始写第1集」
+        调度层->>编剧: 注入第1集骨架 + 角色锚点 + 场景锚点
+        编剧-->>调度层: 剧本草稿
+        调度层-->>用户: 🔒 确认门：审阅剧本
+        用户->>调度层: 确认写入
+        调度层->>数据库: 写入剧本
+
+        par 并行执行
+            调度层->>分镜: 注入剧本草稿 + 角色 / 场景锚点
+            分镜-->>调度层: 分镜树（场景 + 镜头清单）
+        and
+            调度层->>资产: 注入剧本草稿 + 现有资产库
+            资产-->>调度层: 本集新增资产清单
+        end
+
+        调度层-->>用户: 🔒 确认门：审阅分镜树 + 资产
+        用户->>调度层: 确认写入
+        调度层->>数据库: 写入场景 / 镜头 / 资产
+
+        opt 用户需要生成视频提示词
+            调度层->>摄影: 注入镜头描述 + 画风 + 角色外形
+            摄影-->>调度层: 视频生成提示词
+            调度层-->>用户: 🔒 确认门：确认生成任务
+            用户->>调度层: 确认
+            调度层->>数据库: 创建生成任务 → 推入画布
+        end
     end
 ```
+
+### 新增 response_type 规格
+
+| response_type | 触发阶段 | Director 输出核心字段 | 前端组件 | 状态 |
+|--------------|---------|-------------------|---------|------|
+| `expansion` | G1 | `expansion.options[]` (name/hook_3s/core_appeal/why_binge) | `ExpansionMessage` | ✅ |
+| `option_cards` | G1 | `option_cards.options[]` (id/label/hook) | `OptionCardsMessage` | ✅ |
+| `quick_poll` | G1 | `poll_script_id` | `QuickPollMessage` | ✅ |
+| `param_collection` | G1.5 | `param_collection.{selected_direction, fields[{id,label,type,options}]}` | `ParamCollectionMessage` | ✅ 已实现 |
+| `world_card` | G2 | `world_card.{title, logline, characters[], mechanism, visual_style, red_lines[]}` | `WorldCardMessage` | ✅ 已实现 |
+| `null` | 路由/澄清 | `director_message` 纯文本 | 普通文本气泡 | ✅ |
+
+**`param_collection` 字段规格**（v0.3 已实现）：
+
+```typescript
+type ParamCollection = {
+  selected_direction: string;  // 用户选定方向名称，≤20字
+  fields: Array<{
+    id: "episodes" | "visual_style" | "pace" | "audience";
+    label: string;
+    type: "select";
+    options: string[];
+  }>;
+};
+// 前端组件：ParamCollectionMessage
+// 用户确认后发送 client_context.params = { episodes, visual_style, pace, audience }
+// + genesis_step = "create"
+```
+
+**`world_card` 字段规格**（v0.3 已实现）：
+
+```typescript
+type WorldCard = {
+  title: string;          // 4-10字项目标题
+  logline: string;        // ≤40字剧情一句话
+  characters: Array<{ name: string; role: string; trait: string }>;  // 3-5个
+  mechanism: string;      // ≤30字核心机制（触发+代价）
+  visual_style: string;   // 视觉风格（结合用户选定画风）
+  red_lines: string[];    // 3条限制规则（≤20字/条）
+};
+// 前端组件：WorldCardMessage（确认按钮发送 "世界观确认，开始写大纲"）
+```
+
+---
+
+## 7.5 流式思维链架构（v0.3 新增）
+
+### 设计目标
+
+每个 Agent 运行时在前端实时展示流式输出卡片（类 Oii 思维链效果），不再只显示转圈动画。
+
+### 事件协议（SSE）
+
+新增端点：`POST /api/agent/threads/:id/messages/stream`（返回 `text/event-stream`）
+
+每条事件格式：`data: {JSON}\n\n`
+
+```typescript
+type OrchestratorStreamEvent =
+  | { type: "director.route"; run_id: string; intent: string; selected_agents: string[]; director_message: string; used_model: boolean; parse_error?: string | null }
+  | { type: "agent.start"; run_id: string; agent_id: string; agent_name: string }
+  | { type: "agent.token"; run_id: string; agent_id: string; token: string }
+  | { type: "agent.done"; run_id: string; agent_id: string; content: string; model: string; used_model: boolean }
+  | { type: "run.done"; run_id: string; route: object; agents: object[]; approval: object | null; final: object; model_provider: string; model_routing: object }
+  | { type: "error"; message: string };
+```
+
+### 事件流顺序
+
+```
+director.route   → 导演完成路由决策（一次性，非流式 token）
+agent.start      → 某 worker agent 开始
+agent.token ×N   → 该 agent LLM 流式输出 token
+agent.done       → 该 agent 完成
+（repeat for each selected agent，顺序执行）
+run.done         → 所有 agent 完成，触发前端 loadEvents() 拿 DB 最终事件
+```
+
+### 后端实现文件
+
+| 文件 | 改动 | 状态 |
+|------|------|------|
+| `TextModelService` | 新增 `stream()` AsyncGenerator，解析 SSE chunks yield token；兼容 openai-compatible 和 actnow-proxy 两种模式 | ✅ |
+| `MultiAgentOrchestratorService` | 新增 `runStream()` AsyncGenerator；Director 路由保持非流式（JSON 输出），worker agents 改为顺序流式 | ✅ |
+| `AgentEventsService` | 新增 `streamThreadMessage()`，转发 orchestrator 流事件，stream 完成后一次性 `$transaction` 保存所有 DB 事件；同步修复 `final_message_created` 补存 `param_collection`/`world_card` | ✅ |
+| `AgentController` | 新增 `POST threads/:id/messages/stream`，`@Res()` 手动写 SSE headers + for-await chunk 写入 | ✅ |
+
+### 前端实现文件
+
+| 文件 | 改动 | 状态 |
+|------|------|------|
+| `api.ts` | 新增 `streamAgentMessage()` AsyncGenerator，fetch + ReadableStream 解析 SSE | ✅ |
+| `App.tsx` | `handleSendMessage` 改用 `streamAgentMessage`；新增 `streamingCards` state；AbortController 防并发；`run.done` 后 `loadEvents()` | ✅ |
+| `ChatStage.tsx` | 新增 `streamingCards` prop；新增 `AgentThinkingCard` 组件（agent badge + 流式文字 + 闪烁光标）；done 状态变灰 | ✅ |
+| `styles.css` | 新增 `.agent-thinking`、`.agent-thinking-done`、`.thinking-text`、`.thinking-cursor`（blink 动画）样式 | ✅ |
+
+### Director 思维链展示策略
+
+Director 输出 JSON 而非自然语言，不适合流式 token。统一策略：
+- 路由决策完成后发一条 `director.route` 事件
+- 前端渲染为"导演已完成路由"卡片，显示 `director_message`（自然语言，已在 Director prompt 中约束语气）
+- Worker agents（编剧/分镜/资产/摄影）直接流式展示 LLM token 输出
+
+### 存储时机
+
+流式过程中**不写 DB**；`run.done` 事件触发后，后端统一执行一次 `$transaction` 批量写入所有事件（message.created / route_decided / agent_completed / final_message_created 等）。前端在 `run.done` 后调用 `loadEvents()` 拉取最终事件渲染持久化视图，`streamingCards` 清空。
 
 ---
 

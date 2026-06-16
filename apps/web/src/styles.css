@@ -879,6 +879,441 @@ p {
   }
 }
 
+.generating-state {
+  border-color: rgba(52, 216, 180, .28) !important;
+  background: rgba(52, 216, 180, .07) !important;
+}
+
+.generating-state p {
+  color: var(--accent) !important;
+}
+
+/* ── G1 互动卡片 ── */
+
+.option-cards {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.option-card {
+  background: #1a1c24;
+  border: 1px solid #2c2f3a;
+  border-radius: 14px;
+  color: var(--foreground);
+  cursor: pointer;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  font-weight: normal;
+  gap: 5px;
+  min-height: unset;
+  min-width: 140px;
+  max-width: 240px;
+  padding: 14px 16px;
+  text-align: left;
+  transition: border-color var(--motion-duration), background var(--motion-duration);
+}
+
+.option-card:hover {
+  background: #1e2240;
+  border-color: var(--primary);
+}
+
+.option-card strong {
+  color: #e8eaf2;
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.option-card span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.expansion-cards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-top: 14px;
+}
+
+.expansion-card {
+  background: #181a22;
+  border: 1px solid #2c2f3a;
+  border-radius: 14px;
+  color: var(--foreground);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-weight: normal;
+  gap: 7px;
+  min-height: unset;
+  padding: 16px 18px;
+  text-align: left;
+  transition: border-color var(--motion-duration);
+}
+
+.expansion-card:hover {
+  border-color: var(--primary);
+}
+
+.expansion-card strong {
+  color: #e8eaf2;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.expansion-card p {
+  color: #b0b3be;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.expansion-card span {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quick-poll {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.poll-option {
+  background: #1a1c24;
+  border: 1px solid #2c2f3a;
+  border-radius: 999px;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: unset;
+  padding: 8px 18px;
+  transition: border-color var(--motion-duration), background var(--motion-duration);
+}
+
+.poll-option:hover {
+  background: #1e2240;
+  border-color: var(--primary);
+}
+
+/* ── G1.5 参数收集卡 ── */
+
+.param-collection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 18px;
+  background: #1a1c24;
+  border: 1px solid #2c2f3a;
+  border-radius: 14px;
+}
+
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.param-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.param-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.param-opt {
+  background: transparent;
+  border: 1px solid #2c2f3a;
+  border-radius: 999px;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  min-height: unset;
+  padding: 6px 14px;
+  transition: border-color var(--motion-duration), background var(--motion-duration), color var(--motion-duration);
+}
+
+.param-opt:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.param-opt.selected {
+  background: rgba(52, 216, 180, .12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.param-confirm-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.param-confirm-btn {
+  background: var(--accent);
+  color: #0d0e12;
+  font-weight: 700;
+  padding: 10px 22px;
+}
+
+.param-confirm-btn:hover:not(:disabled) {
+  opacity: .9;
+}
+
+/* ── G2 世界观卡 ── */
+
+.world-card {
+  margin-top: 14px;
+  padding: 20px;
+  background: #1a1c24;
+  border: 1px solid rgba(52, 216, 180, .25);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.world-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.world-card-logline {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.world-card-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.world-card-label {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.world-card-section p {
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.world-card-chars,
+.world-card-redlines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.world-card-chars li,
+.world-card-redlines li {
+  font-size: 13px;
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+.world-card-redlines li::before {
+  content: "· ";
+  color: var(--danger);
+}
+
+.world-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+  border-top: 1px solid #2c2f3a;
+}
+
+.world-card-confirm {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  padding: 10px 22px;
+}
+
+.world-card-confirm:hover:not(:disabled) {
+  opacity: .9;
+}
+
+/* Outline card (G3 season spine) */
+.outline-card {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.outline-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.outline-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.outline-card-ep-count {
+  font-size: .8rem;
+  color: var(--muted);
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+}
+
+.outline-card-arc {
+  font-size: .85rem;
+  color: var(--accent);
+  margin: 10px 16px;
+  line-height: 1.5;
+}
+
+.outline-card-episodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.outline-ep-row {
+  display: grid;
+  grid-template-columns: 48px 100px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+.outline-ep-row:last-child {
+  border-bottom: none;
+}
+
+.outline-ep-num {
+  font-size: .72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.outline-ep-title {
+  font-weight: 600;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outline-ep-synopsis {
+  color: color-mix(in srgb, var(--foreground) 75%, transparent);
+}
+
+.outline-card-actions {
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+}
+
+.outline-card-confirm {
+  width: 100%;
+  padding: 10px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--motion-duration);
+}
+
+.outline-card-confirm:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.outline-card-confirm:hover:not(:disabled) {
+  opacity: .9;
+}
+
+/* Agent thinking cards (streaming chain-of-thought) */
+.agent-thinking {
+  border-left: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+.agent-thinking-done {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  opacity: .85;
+}
+
+.thinking-text {
+  font-size: .875rem;
+  line-height: 1.65;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thinking-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--primary);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 @media (max-width: 900px) {
   .workspace-shell,
   .workspace-shell[data-stage="home"] {
