@@ -17,6 +17,9 @@
 | `04-backend-harness.md` | 后端Harness：技术栈 · 数据模型 · Agent编排 · 实施切片 |
 | `05-ops-governance.md` | 运营治理：业务规则 · 数据埋点 · 上线运营 · 风险待决 |
 | `06-agent-system.md` | Agent系统：5 Agent规格 · Harness · 状态机 · SABC · SSE |
+| `07-engineering-specs.md` | 工程规格：环境变量 · 事件队列 · DB schema · 存储 · API · Git · 切片验收 · 联调计划 |
+| `08-design-system.md` | 设计系统：颜色 · 排版 · 布局 · 组件 · 动效 · 视觉QA · 原型待确认 |
+| `09-decisions-log.md` | 决策日志：技术栈冲突（全决）· 层间断层追踪（B1/B2/B3）· 产品决策（D1-D7全决）|
 
 ---
 
@@ -52,6 +55,23 @@
 > 来源：agents/AGENTS-PRD.md v0.3（2026-06-15）
 ```
 
+### 强制录入规则
+
+**任何对代码、配置、提示词、原型的改动，必须同步更新对应子 PRD。** 没有 PRD 记录 = 改动不存在。
+
+对应关系：
+
+| 改动范围 | 更新哪个子PRD |
+|---------|--------------|
+| 前端 UI / 交互 / 页面结构 | 02-frontend-ux.md |
+| API 契约 / 前后端协议 / 状态机 | 03-fullstack-contract.md |
+| 后端架构 / Harness / 数据模型 | 04-backend-harness.md |
+| 运营规则 / 权限 / 上线策略 | 05-ops-governance.md |
+| Agent 系统提示词 / skills / 状态机 | 06-agent-system.md |
+| 环境变量 / DB schema / 存储 / API / 切片 | 07-engineering-specs.md |
+| 设计 token / 组件规则 / 动效 | 08-design-system.md |
+| 技术决策 / 冲突拍板 / open issues | 09-decisions-log.md |
+
 ---
 
 ## 历史存档层（只读）
@@ -61,7 +81,7 @@
 | `../PRD.md` | 原主文件 v0.30，历史真源，**只读存档，不修改不删除** |
 | `../_prototype-deltas.md` | 原型迭代产品决策 PD-1~11，**只读存档** |
 | `../Multi-Agent-Chatroom/PRD-Multi-Agent-Chatroom.md` | v0.4，**只读存档** |
-| `../../agents/AGENTS-PRD.md` | v0.3，**只读存档** |
+| ~~`../../agents/AGENTS-PRD.md`~~ | ~~v0.3，只读存档~~ → ~~已删除，内容归档进 06-agent-system.md~~ |
 
 ---
 
@@ -72,3 +92,4 @@
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-06-16 | v0.1 | 初始化运营规则文档 |
+| 2026-06-16 | v0.2 | 文件列表补入 07/08/09；历史存档层标注 AGENTS-PRD.md 已删除；追加强制录入规则 |
