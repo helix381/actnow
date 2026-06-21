@@ -2,9 +2,9 @@
 
 | 字段 | 内容 |
 |------|------|
-| 版本 | v0.1 |
-| 日期 | 2026-06-16 |
-| 状态 | 草稿 |
+| 版本 | v0.7 |
+| 日期 | 2026-06-20 |
+| 状态 | 维护中 |
 
 > **来源**：`spec/`（constitution · events · database · storage · env · pr-template · README）+ `tech/03-api-contract.md` + `tech/08-engineering-governance.md` + `specs/s1-s9` 功能切片 spec 索引
 >
@@ -535,9 +535,66 @@ failed → canceled
 
 ---
 
+## 13. v1 前后端结合实施计划
+
+> 路线决策见 [09-decisions-log §E](09-decisions-log.md)。真前端按 **B 路线**重建为 **workspace v1**（React + React Flow + Vite，原地改造 `apps/web`），对接**现有后端**，再补建生成半边。v0 = 旧静态原型 `prototype/pages/workspace-v0.html`（只读设计规格）。
+
+### 13.1 前提状态（2026-06-17 核查代码得出）
+
+- **后端创意半边已实**：`apps/api` 真连 Prisma（事务 + 画布乐观锁），覆盖 project/episode/script/scene/shot/canvas + agent thread/message/event + SSE 流式 + 真文本模型代理（腾讯/百炼/qwen 等）。
+- **后端生成半边部分落地**：`canonicalIrJson` 已入 `schema.prisma` 并完成迁移、写入和恢复；`GenerationTask` / `Asset` / `GeneratedFile` / `workflow_templates` 仍未建。
+- **契约**：`apps/web/src/lib/api.ts` 已验证可用（projects / workspace / agent SSE / approvals / canvas），作为复用契约层。
+- **v0**：纯静态、零后端调用；交互/动画/外壳为设计规格来源。
+
+### 13.2 竖切片（端到端优先，推荐 S0 → S1 → S2 → S3）
+
+| 切片 | 目标 | 后端 | 前端 v1 | 验收 |
+|------|------|------|---------|------|
+| **S0 前端骨架** | 立起 v1 空壳 | 无改动 | 外壳（rail + ws-main + stage 容器）+ design-system CSS + `api.ts` 接入 | v1 能跑，深色外壳像素一致 |
+| **S1 创意半边联调** | 打通「建项目 → 聊天 → 锁本 → 进画布」 | 现有；按需边缘重塑 presenter | HOME 创作设置 + FLIP 转场 + 聊天 SSE 流式 + 锁本 | 端到端走通，真模型流式回话 |
+| **S2 画布** | React Flow 复刻 `.ca-stage` | canvas 契约（load / saveCanvas + version） | s1-s5 分阶段帧 + 节点 + 连线 的自定义 RF 节点 | 画布加载/拖拽/存回，版本乐观锁 |
+| **S3 生成半边** | 接 AIGC 生成 / 人在环 | schema 补 `GenerationTask`/`Asset`/`GeneratedFile`/`canonicalIrJson`；状态机 + worker + 人在环交付协议 | 生成触发/进度/回传/资产管理 | 生成任务全生命周期 + 人在环回传 |
+
+### 13.3 API 边缘重塑（连接，不重写）
+
+- 只调 presenter/DTO，让 `WorkspaceAggregate`、`CanvasDocument` 形状贴合 v1 真实所需；数据模型与服务层骨架**不动**。
+- 越界禁止：不为联调/演示另造产品 UI（v0/v1 分叉教训）。
+
+### 13.4 串并行与 gate
+
+- S0 → S1 串行（骨架先行）。S1 后 **S2、S3 可并行**（画布 vs 生成各自切口）。
+- **Serial gate**：S3 的 schema 迁移（生成半边建表）。
+- 天眼层 `canonicalIrJson`（B1）已提前落地并关闭；`workflow_templates`（B3）随 S2 画布控制。
+
+### 13.5 产物落点（设计 vs 生产，务必区分）
+
+| 产物 | 落点 | 说明 |
+|------|------|------|
+| 可双击打开的版本快照 | `prototype/pages/`（`workspace-v0.html` 设计基线 + `workspace-v1.html` 当前最高完成度）| 自包含单文件 HTML，双击看 UI/交互（API 离线空转）|
+| 探索稿 / 风格候选 | `prototype/`（根、`iterations/`）| 发散期草稿 |
+| 原型-前端源码（开发）| `apps/web/`（v1，React+ReactFlow）| 原型即前端，在此开发迭代；带真实数据联调 |
+
+- `prototype/pages` = **当前最高完成度 HTML（设计真源）**，`apps/web` = **收敛后的原型本身（原型即前端）**，二者是「规格 ↔ 实现」，**不是两套前端**。
+- ⚠️ 反模式（ActNow 已踩）：静态原型当产品前端 + 另建 apps/web 却无收敛计划 → 分叉乱套。v1 必须按 v0 收敛，不另起炉灶。
+- **整合工作流**：在 `apps/web` 调好、确定一个版本 → `npm.cmd --prefix apps/web run build:single`（vite-plugin-singlefile）→ 自包含单文件存入 `prototype/pages/workspace-v1.html`；pages 永远有一个可双击的当前最高完成度快照。
+- 通用规则见 `Make-Prototype/SKILL.md` 的「产物落点」节。
+
+### 13.6 本地起后端的已踩坑（2026-06-17）
+
+1. **Windows 保留端口**：Docker Desktop 一起会动态占用大片端口区间（`netsh int ipv4 show excludedportrange protocol=tcp` 查），`3000`/`4173`/`5173` 常落在内被占 → 绑定报 `EACCES: permission denied`。本地改用免占端口：**api `3900`、web dev `3950`**，postgres host `5432`，vite 代理 `/api → 3900`。
+2. **tsx 跑 NestJS DI 失败**：`start:dev`（tsx/esbuild）**不输出 decorator metadata**，NestJS 注入不进服务（`this.xxx` undefined → 请求 500），但应用会"假装"启动成功、路由全 mapped，极具迷惑性。**改用 tsc 构建 + node 跑产物**：`apps/api` 加了 `start:local`（`node --env-file=../../.env --env-file=.env.local dist/apps/api/src/main.js`）；`start:dev`（tsx）待修（换 SWC 或弃用）。
+3. **本地链路**：`docker compose up -d postgres`（override 暴露 5432）→ `packages/db` 的 `db:deploy`+`db:generate`+`db:seed` → `apps/api` `start:local`(:3900) → `apps/web` `dev`(:3950)。模型 key 在根 `.env`。
+
+---
+
 ## 修改记录
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-06-16 | v0.1 | 整理 spec/ 全目录内容归档，+ tech/03/08 精华归入，+ specs/s1-s9 索引 |
 | 2026-06-16 | v0.2 | 补充 §9 切片验收标准 + 串并行原则 + 反模式（tech/06）；新增 §10 前端组件分层 + 状态管理（tech/01）；新增 §11 后端服务模块 + 任务类型（tech/02）；新增 §12 联调计划8步 + E2E验收路径 + 环境矩阵（tech/05）|
+| 2026-06-17 | v0.3 | 新增 §13 v1 前后端结合实施计划：前提状态核查 + 竖切片 S0-S3 + API 边缘重塑 + 串并行 gate + §13.5 产物落点（设计 HTML 在 prototype/、生产 React 在 apps/web）；路线决策见 09 §E |
+| 2026-06-17 | v0.4 | §13.5 收口为「原型即前端」+ 单文件整合工作流：apps/web 调好确定版本 → `build:single`(vite-plugin-singlefile) → 自包含 `prototype/pages/workspace-v1.html`（可双击快照）|
+| 2026-06-17 | v0.5 | 新增 §13.6 本地起后端已踩坑（Windows 保留端口 / tsx NestJS DI 失败 / 本地链路）；S1 创意半边端到端跑通（真模型导演回话）。**遗留：v1 聊天台是旧测试组件套色、非 v0 重建，缺展开画布模式(▥/⛶/◉)+timeline 锚点，待按 v0 重建** |
+| 2026-06-17 | v0.6 | ChatStage 按 v0 重建（用 v0 真类名 → v0-workspace.css 保真）：c-top 模式按钮（展开画布=分水岭侧栏 canvas，S2 占位）+ 右侧 timeline 锚点（灵感/方向/世界观/大纲/剧本/确认，按对话进度 current/done）+ v0 气泡 + 全局细滚动条 + 禁用态灰显；FLIP 转场也搬入 v1。S1 创意半边 UI 对齐 v0 完成 |
+| 2026-06-20 | v0.7 | 新增 G3 两阶段流式编排回归测试（双调用、阶段进度、资产合并、Genesis 禁 worker）、Canonical IR migration/恢复及未知审批动作不得误执行的回归；API/Web 构建与全仓测试作为验收证据；重申本地 API 必须使用 tsc + start:local |

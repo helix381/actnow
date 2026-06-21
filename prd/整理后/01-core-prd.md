@@ -231,7 +231,7 @@ flowchart TD
     end
     subgraph 编排层[编排层 · Harness 工程内核]
         Director[总控 Agent: 意图理解 + 任务路由]
-        Experts[专家 Agent: 编剧/分镜/角色一致 等]
+        Experts[专家 Agent: 编剧/资产/平面设计/分镜]
         WF[工作流状态机: 阶段推进 + 镜头/任务状态]
         Ctx[上下文管理: 项目/集/场景/镜头/资产]
         Prompt[提示词工程基础设施: 模板 + 参考注入]

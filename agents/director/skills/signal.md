@@ -1,5 +1,5 @@
 ---
-name: g2_signal
+name: signal
 description: G2 Step 1 · 信号提取——商业信号、冲突种子、视听落点、金手指边界
 inject_when: genesis_step == "create"
 ---

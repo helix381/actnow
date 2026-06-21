@@ -2,8 +2,8 @@
 
 | 字段 | 内容 |
 |------|------|
-| 版本 | v0.1 |
-| 日期 | 2026-06-16 |
+| 版本 | v0.3 |
+| 日期 | 2026-06-20 |
 | 状态 | 草稿 |
 
 > **对应模块**：4.4 主流程 · 6e Agent聊天框 · 8 生成任务状态机 · 9 人在环交付协议
@@ -37,7 +37,8 @@ flowchart TD
 flowchart TD
     I[一句灵感/模糊想法] --> Q[AI 启发式提问 + 推荐选项]
     Q --> Concrete[灵感由模糊 → 具象]
-    Concrete --> Outline[大纲卡片出现在气泡内（可inline编辑）]
+    Concrete --> World[G2 世界观卡片]
+    World --> Outline[G3 大纲卡片 + Canonical IR资产锚点]
     Outline -->|对话式调整| Outline
     Outline --> ConfirmOutline[确认大纲 → 生成单集剧本卡片]
     ConfirmOutline --> Script[逐集剧本（场景/角色/镜数）]
@@ -53,7 +54,8 @@ flowchart TD
     Done[切画布侧边栏态] --> Split[剧本拆分: 后台自动拆 → Frame铺开校对]
     Split --> Asset[拆资产: 角色/场景/道具（Step1 Frame组件）]
     Asset -.按需,过场可跳过.-> Pano[720°全景 → 3D 导播台（场景组件内子能力）]
-    Asset --> SB[分镜脚本（Step2 Frame组件）]
+    Asset --> GD[Designer 平面设计师<br/>生成提示词]
+    GD --> SB[分镜脚本（Step2 Frame组件）<br/>含景别/运镜/时间码]
     Pano -.设机位.-> SB
     SB --> Mode{镜头生成模式}
     Mode -->|图生| Img[分镜图/关键帧（Step3组件）: 角色+空间一致]
@@ -198,7 +200,9 @@ episodes[]:
   synopsis        单集梗概（inline可编辑）
 ```
 
-**② 天眼层（暗骨/Canonical IR，折叠预留，驱动后续制作的隐线）**：
+**② 天眼层（暗骨/Canonical IR，G3 分阶段生成并合并，驱动后续制作）**：
+
+> 资产出参变更（v0.3）：Asset 层只输出纯结构化数据（id/name/vis/voice/usage/status），不再包含 generation_prompt。提示词美学由 Designer agent 独立产出。
 ```
 logic.ct:
   mix             logline/des/cst/emo_hook/prms
@@ -209,6 +213,7 @@ logic.ct:
 assets:
   chars[]         id/name/role/gender/appearance_stages（多形态）
   locs[]          id/name/tags
+  props[]         id/name/vis/usage（稳定道具锚点）
 logic.thd[]       线程账本（T1主线/T2+副线，含carrier/upgrade_axis/win/payoff_slots）
 logic.evidence_seeds[]   证据种子
 logic.arc_track_type     弧线轨道
@@ -230,6 +235,8 @@ scenes[]:
 ```
 
 > 前端渲染逻辑见 [02-frontend-ux.md](02-frontend-ux.md) PD-11章节；后端编排细节见 [04-backend-harness.md](04-backend-harness.md) 模块10。
+> G3 契约：后端阶段 1 生成完整 `outline_card`，阶段 2 基于该大纲生成 `canonical_ir`，合并后通过同一个 `multi_agent.final_message_created` 事件返回；`canonical_ir.assets.chars/locs/props` 内嵌大纲卡片展示，其他内部推理字段默认不展开。
+> 流式契约：G3 执行期间通过 `director.progress` 依次发送 `outline`、`canonical`、`finalizing` 阶段；前端复用同一张导演卡片增量展示大纲生成进度，不等待最终事件后一次性出现。
 
 ### 业务规则
 
@@ -240,6 +247,8 @@ scenes[]:
 | 6e-R3 | 每次执行操作后反馈"改了什么、影响哪些对象"，并给预览入口 | 操作完成 | — |
 | 6e-R4 | 复杂指令由总控Agent拆解、路由给专家Agent，对用户保持单一对话界面 | 多步骤指令 | 编排细节见04-backend-harness |
 | 6e-R5 | 三态可随时切换，状态与上下文不丢失 | 用户切换形态 | — |
+| 6e-R6 | G1～G3 的 `selected_agents` 必须为空；G3 两阶段任一失败都需保留可观测错误，禁止退化为资产 Agent 说明文字 | Genesis 阶段 | — |
+| 6e-R7 | 审批仅接受服务端明确支持的 `action_type + target_type` 组合；未知动作必须丢弃并令 `needs_approval=false`，禁止映射成其他可执行动作 | 生产期写操作 | — |
 
 ### 验收标准
 
@@ -247,6 +256,7 @@ scenes[]:
 - Given 用户说"把第三场角色服装改成红色重生成"，When 执行，Then 仅第三场相关镜头按新服装重生成、并反馈影响范围。
 - Given 用户在画布专注操作，When 把聊天框收为悬浮球，Then 不影响画布操作、上下文保留。
 - Given 指令存在指代歧义，When Agent无法确定目标，Then 反问澄清而非误操作。
+- Given 用户确认 G2 世界观，When G3 完成，Then 前端从同一最终事件取得大纲与角色/场景/道具资产锚点；无资产时显示空态。
 
 ---
 
@@ -388,3 +398,5 @@ flowchart TD
 | 2026-06-09 | 来源 PRD.md v0.22 | 统一首页入口，同步4.4主流程 |
 | 2026-06-09 | 来源 PRD.md v0.28 | 查漏收口：生成任务状态机默认值收口（重试次数/降级策略/批量回传/校验容差）|
 | 2026-06-16 | v0.1 | 整理搬运到本文件；合并 _prototype-deltas.md PD-3/6/11 |
+| 2026-06-21 | v0.3 | Agent 系统重构：新增 Designer agent 到流程三；Asset 出参去掉 generation_prompt；可编辑气泡升级审批门 |
+| 2026-06-20 | v0.2 | 新增 G2→G3 两阶段流式生成与单事件合并契约；Canonical IR assets 补 props 并持久化恢复；补 Genesis worker 禁令、失败可观测规则及审批动作白名单 |
