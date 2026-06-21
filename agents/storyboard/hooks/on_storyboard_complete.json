@@ -1,0 +1,16 @@
+{
+  "hook_id": "on_storyboard_complete",
+  "trigger": "storyboard.breakdown.confirmed",
+  "description": "分镜确认，推入生成任务",
+  "actions": [
+    {
+      "type": "db_write",
+      "target": "Scene/Shot"
+    },
+    {
+      "type": "create_generation_tasks",
+      "source": "shots[]",
+      "mode": "prompt_ready"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "hook_id": "on_approval_created",
+  "trigger": "director.output.needs_approval=true",
+  "description": "路由输出含审批动作，前端渲染可编辑气泡",
+  "actions": [
+    {
+      "type": "emit_event",
+      "event": "ui.approval_card.show"
+    }
+  ]
+}

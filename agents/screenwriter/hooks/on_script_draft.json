@@ -1,0 +1,26 @@
+{
+  "hook_id": "on_script_draft",
+  "trigger": "screenwriter.script_draft.confirmed",
+  "description": "剧本确认，并行启动Asset+Designer",
+  "actions": [
+    {
+      "type": "db_write",
+      "target": "ScriptDraft"
+    },
+    {
+      "type": "parallel_invoke",
+      "agents": [
+        {
+          "agent": "asset",
+          "intent": "asset_extraction",
+          "background": true
+        },
+        {
+          "agent": "designer",
+          "intent": "design_prompt",
+          "background": true
+        }
+      ]
+    }
+  ]
+}

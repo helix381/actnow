@@ -1,0 +1,22 @@
+{
+  "hook_id": "on_design_complete",
+  "trigger": "designer.design_prompt.confirmed",
+  "description": "提示词确认，与Asset汇合后触发Storyboard",
+  "actions": [
+    {
+      "type": "db_write",
+      "target": "DesignPrompt"
+    },
+    {
+      "type": "check_gate",
+      "gate": "asset_and_design_ready",
+      "on_ready": [
+        {
+          "type": "invoke_agent",
+          "agent": "storyboard",
+          "intent": "storyboard_breakdown"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "hook_id": "on_script_revision",
+  "trigger": "screenwriter.script_revision.confirmed",
+  "description": "剧本修改，通知下游受影响Agent",
+  "actions": [
+    {
+      "type": "db_write",
+      "target": "ScriptDraft"
+    },
+    {
+      "type": "notify_downstream",
+      "affected": [
+        "asset",
+        "designer",
+        "storyboard"
+      ]
+    }
+  ]
+}

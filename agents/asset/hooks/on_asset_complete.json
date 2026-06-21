@@ -1,0 +1,16 @@
+{
+  "hook_id": "on_asset_complete",
+  "trigger": "asset.extraction.confirmed",
+  "description": "Asset确认，通知Designer",
+  "actions": [
+    {
+      "type": "db_write",
+      "target": "Asset"
+    },
+    {
+      "type": "signal",
+      "target": "designer",
+      "signal": "asset_ready"
+    }
+  ]
+}

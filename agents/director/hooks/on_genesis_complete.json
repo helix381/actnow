@@ -1,0 +1,16 @@
+{
+  "hook_id": "on_genesis_complete",
+  "trigger": "director.g3.complete",
+  "description": "G3大纲完成后，Canonical IR写入DB",
+  "actions": [
+    {
+      "type": "db_write",
+      "target": "Project.canonicalIrJson",
+      "source": "assembled_canonical_ir"
+    },
+    {
+      "type": "emit_event",
+      "event": "project.canonical_ir.updated"
+    }
+  ]
+}

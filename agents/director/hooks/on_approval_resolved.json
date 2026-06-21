@@ -1,0 +1,27 @@
+{
+  "hook_id": "on_approval_resolved",
+  "trigger": "user.approval_resolved",
+  "description": "确认→写DB；拒绝→通知Director重试",
+  "actions": [
+    {
+      "type": "conditional",
+      "condition": "resolution=='confirmed'",
+      "then": [
+        {
+          "type": "db_write"
+        },
+        {
+          "type": "emit_event",
+          "event": "agent.action.confirmed"
+        }
+      ],
+      "else": [
+        {
+          "type": "notify_agent",
+          "agent": "director",
+          "message": "用户拒绝"
+        }
+      ]
+    }
+  ]
+}
