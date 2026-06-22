@@ -2,7 +2,7 @@
 
 | 字段 | 内容 |
 |------|------|
-| 版本 | v0.5 |
+| 版本 | v0.6 |
 | 日期 | 2026-06-20 |
 | 状态 | 草稿 |
 
@@ -115,7 +115,7 @@ erDiagram
 
 优先级：`local > project`（数据库是运行时状态，不是配置真源）
 
-#### settings.json Schema
+#### settings.json 完整 Schema
 
 ```json
 {
@@ -126,12 +126,20 @@ erDiagram
     "language": "zh-CN"
   },
   "hooks": {
-    "on_script_draft": [
+    "on_genesis_complete": [
       {
-        "matcher": "screenwriter.*",
+        "matcher": "director.g3.*",
         "actions": [
-          { "type": "invoke_agent", "agent": "asset" },
-          { "type": "invoke_agent", "agent": "designer" }
+          { "type": "db_write", "target": "Project.canonicalIrJson" },
+          { "type": "emit_event", "event": "project.canonical_ir.updated" }
+        ]
+      }
+    ],
+    "on_approval_created": [
+      {
+        "matcher": "*",
+        "actions": [
+          { "type": "emit_event", "event": "ui.approval_card.show" }
         ]
       }
     ],
@@ -139,9 +147,37 @@ erDiagram
       {
         "matcher": "*",
         "actions": [
-          { "type": "conditional", "condition": "confirmed",
-            "then": { "type": "db_write" },
-            "else": { "type": "notify_agent" } }
+          { "type": "conditional", "condition": "resolution=='confirmed'",
+            "then": [
+              { "type": "db_write" },
+              { "type": "emit_event", "event": "agent.action.confirmed" }
+            ],
+            "else": [
+              { "type": "emit_event", "event": "agent.action.rejected" },
+              { "type": "notify_agent", "agent": "$source_agent" }
+            ]
+          }
+        ]
+      }
+    ],
+    "on_script_draft": [
+      {
+        "matcher": "screenwriter.*",
+        "actions": [
+          { "type": "db_write", "target": "ScriptDraft" },
+          { "type": "parallel_invoke", "agents": [
+            { "agent": "asset", "intent": "asset_extraction" },
+            { "agent": "designer", "intent": "design_prompt" }
+          ]}
+        ]
+      }
+    ],
+    "on_script_revision": [
+      {
+        "matcher": "screenwriter.*",
+        "actions": [
+          { "type": "db_write", "target": "ScriptDraft" },
+          { "type": "notify_downstream", "affected": ["asset", "designer", "storyboard"] }
         ]
       }
     ]
@@ -152,6 +188,54 @@ erDiagram
   }
 }
 ```
+
+#### Hook Action 类型定义
+
+| Action 类型 | 参数 | 说明 |
+|------------|------|------|
+| `db_write` | target, source | 写入数据库指定表 |
+| `emit_event` | event, payload | 发送事件到前端/事件总线 |
+| `invoke_agent` | agent, intent, background | 调用指定 Agent |
+| `parallel_invoke` | agents[] | 并行调用多个 Agent |
+| `conditional` | condition, then, else | 条件分支 |
+| `notify_agent` | agent, message | 通知指定 Agent |
+| `notify_downstream` | affected[] | 通知所有下游 Agent |
+| `check_gate` | gate, conditions, on_ready | 等待多个条件满足后触发 |
+| `create_generation_tasks` | source, mode | 创建生成任务 |
+| `webhook` | url, method, headers | 调用外部 HTTP 接口 |
+
+#### Hook 加载与合并流程
+
+```mermaid
+flowchart TD
+    A[Harness 启动] --> B[加载 .actnow/settings.json hooks]
+    B --> C[加载 agents/*/hooks/*.json]
+    C --> D[按 event 分组合并]
+    D --> E{同名 hook?}
+    E -->|是| F[settings.json 优先覆盖]
+    E -->|否| G[保留两处]
+    F --> H[合并完成]
+    G --> H
+    H --> I[注册到 Harness 事件系统]
+    
+    J[Agent 输出事件] --> K[Harness 查找匹配 hook]
+    K --> L[按 matcher 过滤]
+    L --> M[执行 actions]
+    M --> N[返回结果]
+```
+
+#### settings.json 与 Agent hooks 的职责划分
+
+| Hook | 归属 | 理由 |
+|------|------|------|
+| `on_genesis_complete` | settings.json | Harness 层编排逻辑 |
+| `on_approval_created` | settings.json | Harness 层 UI 交互 |
+| `on_approval_resolved` | settings.json | Harness 层审批流 |
+| `on_script_draft` | settings.json | Harness 层并行编排 |
+| `on_script_revision` | settings.json | Harness 层下游通知 |
+| `on_asset_complete` | agent/asset/hooks/ | Asset 自己的生命周期 |
+| `on_design_complete` | agent/designer/hooks/ | Designer 自己的生命周期 |
+| `on_storyboard_complete` | agent/storyboard/hooks/ | Storyboard 自己的生命周期 |
 
 #### 加载流程
 
