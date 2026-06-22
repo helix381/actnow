@@ -2,7 +2,7 @@
 
 | 字段 | 内容 |
 |------|------|
-| 版本 | v0.4 |
+| 版本 | v0.5 |
 | 日期 | 2026-06-20 |
 | 状态 | 草稿 |
 
@@ -91,6 +91,91 @@ erDiagram
 | GeneratedFile → version | 同一 Shot 多次生成按版本保留，默认保留最近5版可回退、超出滚动清理 | 结果可追溯、可回退 |
 
 > 完整存储方案（GeneratedFile落地存储、CDN/对象存储生命周期）见 [05-ops-governance.md](05-ops-governance.md) 模块12。
+
+### 7.3.1 文件级配置系统（settings.json）
+
+> 参考 Claude Code 的 `.claude/settings.json` 分层配置架构。
+
+#### 配置文件位置
+
+```
+项目根目录/
+├── .actnow/settings.json         ← 项目级配置（git提交，团队共享）
+├── .actnow/settings.local.json   ← 本地覆盖（gitignore，个人调试用）
+└── agents/
+```
+
+#### 配置层级与优先级
+
+| 层 | 路径 | 用途 | Git |
+|----|------|------|-----|
+| 项目级 | `.actnow/settings.json` | 项目共享配置（风格/画风/比例/模型/全局hooks） | ✅ 提交 |
+| 本地级 | `.actnow/settings.local.json` | 本地覆盖（调试/测试用） | ❌ gitignore |
+| 数据库 | `Project.settings` | 运行时状态（从文件加载+用户操作合并） | — |
+
+优先级：`local > project`（数据库是运行时状态，不是配置真源）
+
+#### settings.json Schema
+
+```json
+{
+  "project": {
+    "style": "2d_korean",
+    "aspect_ratio": "9:16",
+    "model": "auto",
+    "language": "zh-CN"
+  },
+  "hooks": {
+    "on_script_draft": [
+      {
+        "matcher": "screenwriter.*",
+        "actions": [
+          { "type": "invoke_agent", "agent": "asset" },
+          { "type": "invoke_agent", "agent": "designer" }
+        ]
+      }
+    ],
+    "on_approval_resolved": [
+      {
+        "matcher": "*",
+        "actions": [
+          { "type": "conditional", "condition": "confirmed",
+            "then": { "type": "db_write" },
+            "else": { "type": "notify_agent" } }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [],
+    "deny": []
+  }
+}
+```
+
+#### 加载流程
+
+```mermaid
+flowchart TD
+    A[项目启动] --> B[读取 .actnow/settings.json]
+    B --> C[合并 .actnow/settings.local.json]
+    C --> D[校验 Schema]
+    D --> E[写入 Project.settings 字段]
+    E --> F[Harness 运行时使用]
+    
+    G[用户在首页修改参数] --> H[更新 Project.settings]
+    H --> I[可选: 回写 settings.json]
+```
+
+#### 与现有设计的关系
+
+| 现有设计 | 配置系统补充 |
+|---------|------------|
+| 首页风格/比例/模型控件 | 值写入 settings.json + Project.settings |
+| `inject_project_params` tool | 从 Project.settings 读取（已从 settings.json 加载） |
+| Agent hooks（各agent/hooks/目录） | 保留，agent自己声明生命周期 |
+| 全局hooks | 新增：settings.json 的 hooks 字段，跨agent的全局事件处理 |
+| `on_approval_created/resolved` | 从agent目录移到settings.json（属于Harness层，不属于agent） |
 
 ### 7.4 工程现状 vs PRD 数据模型的差距（来源：tech/10-prototype-flow-alignment.md v0.2）
 

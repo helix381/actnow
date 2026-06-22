@@ -103,4 +103,6 @@ PRD v0.30、后端 tech/specs、原型三方对以下问题给出了互相矛盾
 | 2026-06-16 | v0.1 | 从 `prd/_前置作业/02-PRD滞后审计.md` 搬运归档；A/C/D 区全部决策已关闭；B 区 3 条断层保留追踪 |
 | 2026-06-17 | v0.2 | 新增 E 区：前后端结合路线决策（v1 React 重建 / apps/web 改造 / 连接不重写 / React Flow 画布 / 保真验证），E1-E6 + 生成半边 schema 缺口 |
 | 2026-06-20 | v0.3 | 关闭 B1：G3 两阶段流式生成、事件/前端资产展示、Canonical IR 项目持久化与重进恢复均已落地；同步审批动作白名单验证结果 |
+| F9 | 文件级配置系统(settings.json) | Claude Code有.claude/settings.json分层配置 | ✅ **新增 .actnow/settings.json**（项目级）+ settings.local.json（本地级）；Project.settings从文件加载+用户操作合并；全局hooks可在settings.json中定义 | [04 §7.3.1](04-backend-harness.md) |
+
 | 2026-06-21 | v0.4 | 新增 F 区：Agent 系统优化决策（F1-F8，含 Designer 新增 / 分镜+摄影合并 / G1G1.5 合并 / 首页参数前置 / 可编辑气泡 / Tools 定义 / Skills 分层）；同步更新 02/03/04/06 各子 PRD |
